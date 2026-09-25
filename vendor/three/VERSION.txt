@@ -1,0 +1,1 @@
+three.js r179 (0.179.1), MIT — copied from npm package 'three'.
