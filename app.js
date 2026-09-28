@@ -13,6 +13,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MarkerTracker, estimatePose, focalFromH } from './tracker.js';
 import { Inspector } from './inspect.js';
+import { StoryPlayer, STORIES, LAYER_STORIES, SHOW } from './story.js';
 
 const $ = s => document.querySelector(s);
 const PROC = 640;            // long side of the image the tracker works on, px
@@ -127,7 +128,7 @@ const modelReady = (async () => {
     const [k, room, floor, reserve, ...trs] = nodeInfo.get(o.name);
     const e = { name: o.name, kind: meta.kinds[k], room, floor, reserve: !!reserve, trs, hidden: false, sub: o.name.startsWith('SUB-TX-'), parts: [],
       pos: new THREE.Vector3().setFromMatrixPosition(o.matrixWorld), y: 0, start: 0, end: 0, delay: 0, amount: 0, radius: 2 };
-    const box = new THREE.Box3().setFromObject(o); e.radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + 2;
+    const box = new THREE.Box3().setFromObject(o); e.radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + 2; e.height = box.max.y - box.min.y;
     const meshes = []; o.traverse(m => { if (m.isMesh) meshes.push(m); });
     for (const m of meshes) {
       const key = m.geometry.uuid + '|' + m.material.uuid;
@@ -224,6 +225,7 @@ function setLayer(m) {
   const [t, v, n] = SUMMARY[m];
   $('#sumTitle').textContent = t; $('#sumValue').textContent = v; $('#sumNote').textContent = n;
   for (const b of document.querySelectorAll('#modes button')) b.classList.toggle('on', b.dataset.m === m);
+  buildChips(m);
 }
 
 const tmpM = new THREE.Matrix4(), tmpV = new THREE.Vector3();
@@ -240,6 +242,7 @@ function tickLayers(dt) {
     e.amount = clamp01(e.y / Math.max(1, liftOf(e)));
     e.show = e.sub || inLayer(e.kind, layer) || e.amount > 0.001 || (layer === 'construction');
     if (!open && !e.sub) e.show = false;
+    if (e.pinned && !e.hidden) e.show = true; // units a story route or ring points at
     if (e.hidden) e.show = false;
   }
   for (const im of groups) {
@@ -323,18 +326,40 @@ function inspectAt(cx, cy) {
   const own = ray.intersectObjects(inspector.pickables(), true).filter(h => h.object.visible && h.object.isMesh && h.object.material.opacity > 0.5);
   if (own.length && inspector.tap(own[0].object)) { updateCard(); return; }
   const hits = ray.intersectObjects(groups.filter(g => g.visible), false).map(h => h.object.userData.vis[h.instanceId]).filter(e => e && e.show);
-  if (hits[0]) { setTour(false); inspector.openUnit(hits[0]); frameInspector(true); }
+  let pick = hits[0];
+  if (!pick) { // small units on a phone: the nearest one within ~28 px of the finger
+    const cam2 = mode === 'ar' ? arCam : viewCam, model = fit.children[0], v = new THREE.Vector3();
+    let best = 28 * 28;
+    for (const e of eq) {
+      if (!e.show) continue;
+      v.set(e.pos.x, e.pos.y + e.y + e.height * 0.5, e.pos.z); model.localToWorld(v).project(cam2);
+      if (v.z > 1) continue;
+      const dx = (v.x + 1) / 2 * innerWidth - cx, dy = (1 - v.y) / 2 * innerHeight - cy, d2 = dx * dx + dy * dy;
+      if (d2 < best) { best = d2; pick = e; }
+    }
+  }
+  if (player && player.active && !player.paused) player.toggle(); // a tap takes over: the story waits
+  if (pick) { inspector.openUnit(pick); frameInspector(true); }
   else if (inspector.open) { inspector.close(); frameInspector(false); }
 }
 function updateCard() {
   const c = inspector && inspector.card();
-  $('#inspect').hidden = !c;
+  $('#inspect').hidden = !c || (player && player.active && !player.paused);
   if (!c) return;
   $('#insTitle').textContent = c.title; $('#insMetric').textContent = c.metric;
   $('#insBody').textContent = c.body; $('#insNote').textContent = c.note;
   const lv = $('#insLevel');
   lv.hidden = !c.canExplode || c.level < 0;
   lv.textContent = c.level ? 'Собрать' : 'Раскрыть';
+}
+// 3D mode on a phone: a card at the bottom covers the model, so the picture slides up above it
+let viewOffY = 0;
+function tickViewOffset(dt) {
+  let target = 0;
+  if (innerWidth < 900) for (const id of ['#story', '#inspect']) { const el = $(id); if (!el.hidden) target = Math.max(target, el.offsetHeight * 0.5); }
+  viewOffY += (target - viewOffY) * (1 - Math.exp(-dt * 4));
+  if (Math.abs(viewOffY) > 0.5) viewCam.setViewOffset(innerWidth, innerHeight, 0, viewOffY, innerWidth, innerHeight);
+  else if (viewCam.view) viewCam.clearViewOffset();
 }
 // 3D mode: fly the orbit camera to the opened unit and back
 let camGoal = null, camHome = null;
@@ -498,9 +523,35 @@ function drawDebug() {
 }
 
 // ------------------------------------------------------------------ tour ("Показ")
-const TOUR = ['compute', 'power', 'cooling', 'network', 'continuity', 'construction', 'overview'];
-let touring = false, tourT = 0, tourI = 0;
-function setTour(on) { touring = on; tourT = 0; tourI = 0; $('#tour').classList.toggle('on', on); $('#tour').textContent = on ? '❚❚ Показ' : '▶ Показ'; if (on) setLayer(TOUR[0]); }
+// ------------------------------------------------------------------ stories (story.js): "Как устроено" + ▶ Показ
+let player = null;
+function setTour(on) { if (!player) return; if (on) player.play(SHOW[0], SHOW.slice(1)); else if (player.queue.length || player.active) player.stop(); }
+function buildChips(m) {
+  const el = $('#chips'); el.innerHTML = '';
+  for (const id of LAYER_STORIES[m] || []) {
+    const b = document.createElement('button'); b.className = 'chip'; b.innerHTML = `<span>▶</span> ${STORIES[id].name}`;
+    b.onclick = () => { if (inspector) inspector.close(); player.play(id); };
+    el.appendChild(b);
+  }
+}
+const storyUI = {
+  show(p) { $('#story').hidden = false; $('#chips').hidden = true; $('#inspect').hidden = true; this.update(p); },
+  hide() { $('#story').hidden = true; $('#chips').hidden = false; $('#tour').classList.remove('on'); updateCard(); },
+  update(p) {
+    const st = p.story; if (!st) return;
+    const step = st.steps[p.i];
+    $('#stName').textContent = st.name + (p.queue.length ? ` · дальше: ${STORIES[p.queue[0]].name}` : '');
+    $('#stCount').textContent = `${p.i + 1} / ${st.steps.length}`;
+    $('#stTitle').textContent = step.t; $('#stText').textContent = step.x; $('#stResult').textContent = step.r;
+    $('#stPlay').textContent = p.paused ? '▶' : '❚❚';
+    const bar = $('#stBar');
+    if (bar.children.length !== st.steps.length) { bar.innerHTML = ''; st.steps.forEach(() => { const d = document.createElement('i'); d.appendChild(document.createElement('b')); bar.appendChild(d); }); }
+    [...bar.children].forEach((d, k) => { d.firstChild.style.width = k < p.i ? '100%' : '0%'; });
+    $('#tour').classList.toggle('on', p.queue.length > 0);
+    $('#story').classList.remove('fresh'); void $('#story').offsetWidth; $('#story').classList.add('fresh');
+  },
+  progress(p, f) { const d = $('#stBar').children[p.i]; if (d) d.firstChild.style.width = (f * 100).toFixed(1) + '%'; },
+};
 
 const statusEl = $('#status');
 let lastT = performance.now();
@@ -509,7 +560,7 @@ function loop() {
   const now = performance.now(), dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
   frames++;
   if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
-  if (touring) { tourT += dt; if (tourT > 7) { tourT = 0; tourI = (tourI + 1) % TOUR.length; setLayer(TOUR[tourI]); } }
+  if (player) player.tick(dt);
   tickLayers(dt);
   if (mode === 'ar') {
     track();
@@ -529,13 +580,16 @@ function loop() {
     drawDebug();
     scene.updateMatrixWorld();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(new THREE.Vector3())); inspector.drawLabels(arCam); }
+    if (player) player.drawTags(arCam);
     drawLabels(arCam);
     renderer.render(scene, arCam);
   } else if (mode === '3d') {
     tickCamera(dt);
+    tickViewOffset(dt);
     controls.update();
     scene.updateMatrixWorld();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(viewCam.position.clone())); inspector.drawLabels(viewCam); }
+    if (player) player.drawTags(viewCam);
     drawLabels(viewCam);
     renderer.render(scene, viewCam);
     $('#stats').textContent = `${fps.toFixed(0)} к/с · ${renderer.info.render.calls} вызовов · ${(renderer.info.render.triangles / 1e6).toFixed(2)} M треуг.`;
@@ -594,10 +648,12 @@ function initUI() {
   const modesEl = $('#modes');
   for (const [m, name] of MODES) {
     const b = document.createElement('button'); b.dataset.m = m; b.textContent = name;
-    b.onclick = () => { setTour(false); setLayer(m); };
+    b.onclick = () => { if (player) player.stop(); setLayer(m); };
     modesEl.appendChild(b);
   }
-  $('#tour').onclick = () => setTour(!touring);
+  $('#tour').onclick = () => setTour(!(player && player.queue.length));
+  $('#stPrev').onclick = () => player.prev(); $('#stNext').onclick = () => player.next();
+  $('#stPlay').onclick = () => player.toggle(); $('#stClose').onclick = () => player.stop();
   document.querySelector('#bar [data-t=settings]').onclick = () => { $('#settings').hidden = !$('#settings').hidden; };
   $('#close').onclick = () => { $('#settings').hidden = true; };
   $('#insClose').onclick = () => { if (inspector) { inspector.close(); frameInspector(false); } };
@@ -637,6 +693,8 @@ async function main() {
   const model = fit.children[0];
   attachStages(model);
   inspector = new Inspector({ model, labels: labelsEl, onChange: updateCard });
+  player = new StoryPlayer({ model, eqByName, inspector, setLayer: m => setLayer(m), labels: labelsEl, ui: storyUI,
+    onFrame: e => frameInspector(!!e) });
   setLayer('overview'); reveal = 0;
   applyCalib();
   $('#btnAr').disabled = $('#btn3d').disabled = false;
@@ -648,4 +706,4 @@ main();
 
 // for debugging from the console / tests
 window.__ar = { get pose() { return pose; }, get dets() { return lastDets; }, get fps() { return fps; }, S, setLayer,
-  get layer() { return layer; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };
+  get layer() { return layer; }, get player() { return player; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };

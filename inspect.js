@@ -90,6 +90,7 @@ export class Inspector {
   constructor({ model, labels, onChange }) {
     this.model = model; this.labels = labels; this.onChange = onChange || (() => {});
     this.s = null; this.time = 0;
+    this.fx = { rotor: 1, engine: false }; // story effects: DRUPS flywheel speed, diesel running
     this.leader = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]),
       new THREE.LineBasicMaterial({ color: 0x7de8ff, transparent: true, opacity: 0.8, depthWrite: false }));
     this.leader.frustumCulled = false; this.leader.visible = false; model.add(this.leader);
@@ -104,15 +105,15 @@ export class Inspector {
   get selected() { return this.s?.e || null; }
 
   async openUnit(e) {
-    if (this.s && this.s.e === e) return;
+    if (this.s && this.s.e === e && !this.s.returning) return true;
     this.closeNow();
     const s = this.s = { e, kind: e.kind, open: 0, explode: 0, level: 0, returning: false, age: 0, ready: false, tray: null };
     e.hidden = true;
     this.onChange();
     let hero;
     try { hero = await loadHero(e.kind); } catch (err) { console.warn('no hero model for', e.kind, err); }
-    if (this.s !== s) return;
-    if (!hero) { e.hidden = false; this.s = null; this.onChange(); return; }
+    if (this.s !== s) return false;
+    if (!hero) { e.hidden = false; this.s = null; this.onChange(); return false; }
     const pivot = s.pivot = new THREE.Group();
     const root = s.root = hero.children.length === 1 && !hero.children[0].isMesh ? hero.children[0] : hero;
     pivot.add(hero);
@@ -136,6 +137,7 @@ export class Inspector {
     s.ready = true;
     if (e.kind === 'Rack') loadHero('Tray').catch(() => {});
     this.onChange();
+    return true;
   }
 
   collect(root, kind) {
@@ -208,6 +210,9 @@ export class Inspector {
     s.root.add(tr.obj);
   }
 
+  // story helpers
+  pullTrayByName(name) { const s = this.s; if (!s || !s.ready || s.tray) return; const n = s.root.children.find(o => o.name === name); if (n) { s.level = 0; this.pullTray(n); } }
+  trayBack() { if (this.s?.tray) this.s.tray.back = true; }
   close() { if (this.s) { this.s.returning = true; if (this.s.tray) this.s.tray.back = true; this.s.level = 0; } }
   closeNow() {
     const s = this.s; if (!s) return;
@@ -240,7 +245,8 @@ export class Inspector {
     for (const p of s.parts) {
       p.obj.position.copy(p.home).addScaledVector(p.off, ex);
       if (p.spin === 'y') p.obj.quaternion.copy(p.q0).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), this.time * (1.5 + 2.5 * k)));
-      if (p.spin === 'x') p.obj.quaternion.copy(p.q0).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), this.time * 3.1 * k));
+      if (p.spin === 'x') { s.rotorAngle = (s.rotorAngle || 0) + dt * 3.1 * k * this.fx.rotor; p.obj.quaternion.copy(p.q0).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), s.rotorAngle)); }
+      if (this.fx.engine && /^Engine/.test(p.name)) p.obj.position.y += Math.sin(this.time * 45) * 0.012;
     }
     // leader line and halo at the installed place
     const lp = this.leader.geometry.attributes.position;
