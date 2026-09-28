@@ -29,10 +29,24 @@ button:disabled { opacity: .45; }
 #status { position: absolute; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
   white-space: nowrap; }
 .pill { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 13px; }
-#bar { position: absolute; left: 0; right: 0; bottom: max(14px, env(safe-area-inset-bottom)); display: flex; gap: 8px;
-  justify-content: center; padding: 0 16px; pointer-events: auto; }
-#bar button { background: var(--panel); min-width: 56px; }
-#bar button.on { border-color: var(--accent); color: var(--accent); }
+#bar { position: absolute; left: 0; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); display: flex; gap: 6px;
+  align-items: center; padding: 0 10px; pointer-events: auto; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+#bar::-webkit-scrollbar { display: none; }
+#modes { display: flex; gap: 6px; margin: 0 auto; }
+#bar button { background: var(--panel); white-space: nowrap; padding: 10px 12px; font-size: 14px; flex: none; }
+#bar button.on { border-color: var(--accent); color: var(--accent); background: rgba(54, 194, 168, .14); }
+.card { position: absolute; background: var(--panel); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; pointer-events: auto; }
+#summary { left: 12px; top: calc(max(12px, env(safe-area-inset-top)) + 40px); max-width: 290px; pointer-events: none; }
+#sumValue { font-size: 22px; font-weight: 700; line-height: 1.2; margin: 2px 0; }
+#sumNote { white-space: pre-line; }
+#inspect { left: 12px; right: 12px; bottom: calc(max(12px, env(safe-area-inset-bottom)) + 58px); max-width: 420px; margin: 0 auto; }
+#inspect b { letter-spacing: .04em; }
+#insBody { margin: 4px 0; font-size: 14px; }
+#labels { position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
+.tag { position: absolute; transform: translate(-50%, -100%); background: rgba(12, 18, 26, .78); border: 1px solid rgba(120, 220, 240, .35);
+  border-radius: 7px; padding: 3px 8px; font-size: 12px; white-space: nowrap; color: var(--text); transition: opacity .25s; }
+@media (min-width: 900px) { #summary { top: 16px; } #status { left: auto; right: 16px; transform: none; } }
 .sheet { left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); max-width: 460px; margin: 0 auto; padding: 14px 16px;
   max-height: 72vh; overflow: auto; touch-action: pan-y; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
