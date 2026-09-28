@@ -3,7 +3,8 @@
 // PumpAR > Web > Export hologram for web, compressed by tools/make_hologram_glb.mjs) stands on the mat as a hologram.
 // The layers of the Unity app are ported: Макет / Серверы / Энергия / Охлаждение / Сеть / Защита / Все системы lift the
 // installed equipment out of the opened buildings (MaketLayerMotion + MaketArchitectureReveal), with hall decks, captions,
-// the project summary card (QtwinModelSummary) and a tap-to-inspect card (MaketHologramInspector, level 0).
+// the project summary card (QtwinModelSummary) and the equipment inspector (inspect.js: MaketHologramInspector —
+// the unit rises and turns to the viewer, comes apart; NVL72: a compute tray slides out and opens).
 // Without a camera (or on a desktop) the same scene is a plain 3D viewer.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -11,6 +12,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MarkerTracker, estimatePose, focalFromH } from './tracker.js';
+import { Inspector } from './inspect.js';
 
 const $ = s => document.querySelector(s);
 const PROC = 640;            // long side of the image the tracker works on, px
@@ -39,20 +41,6 @@ const SUMMARY = { // QtwinModelSummary
   construction: ['Все системы', '978 единиц оборудования', 'Расчётная очередь 50 МВт'],
 };
 const TINT = { power: new THREE.Color(0.9, 0.66, 0.31), cooling: new THREE.Color(0.30, 0.68, 1) }, TINT0 = new THREE.Color(0.34, 0.84, 0.93);
-const CARD = { // MaketHologramInspector.Words, level 0
-  Rack: ['СТОЙКА NVL72', 'Вычисления, связь, питание и охлаждение в одном узле'],
-  StandardRack: ['СЕРВЕРНАЯ СТОЙКА', 'Стандартная стойка общего назначения'],
-  DRUPS: ['НЕПРЕРЫВНОЕ ПИТАНИЕ', 'Двигатель · генератор · запас кинетической энергии', 'Принцип DRUPS · темп показа условный'],
-  CDU: ['РАЗДЕЛЕНИЕ КОНТУРОВ', 'CDU связывает охлаждение здания и стоек'],
-  DryCooler: ['ТЕПЛО УХОДИТ НАРУЖУ', 'Теплоноситель отдаёт тепло через оребрённые секции и вентиляторы'],
-  Chiller: ['ХОЛОДОСНАБЖЕНИЕ', 'Чиллер готовит холодный теплоноситель для второго уровня охлаждения'],
-  Transformer: ['ПРЕОБРАЗОВАНИЕ НАПРЯЖЕНИЯ', 'От подстанции — к системе распределения'],
-  Switchgear: ['УПРАВЛЕНИЕ ЛИНИЕЙ', 'Силовые шины · коммутация · измерение · защита'],
-  Network: ['СВЯЗЬ МЕЖДУ УЗЛАМИ', 'Коммутаторы и оптические соединения объединяют вычисления'],
-  CRAH: ['ВОЗДУШНЫЙ КОНТУР', 'Отвод остаточного тепла и поддержание среды в зале'],
-  Fire: ['ЛОКАЛЬНАЯ ЗАЩИТА', 'Контроль одной зоны без остановки соседних систем', 'Иллюстрация принципа · состав системы задаёт проект'],
-  Operations: ['ОПЕРАТОРСКИЙ ЦЕНТР', 'Наблюдение за питанием, охлаждением и вычислениями'],
-};
 const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
 const clamp01 = t => Math.min(1, Math.max(0, t));
 const smoothstep = (a, b, t) => { t = clamp01(t); return a + (b - a) * t * t * (3 - 2 * t); };
@@ -136,8 +124,8 @@ const modelReady = (async () => {
   const equipmentObjs = [];
   model.traverse(o => { if (nodeInfo.has(o.name) && !eqByName.has(o.name)) { eqByName.set(o.name, null); equipmentObjs.push(o); } });
   for (const o of equipmentObjs) {
-    const [k, room, floor] = nodeInfo.get(o.name);
-    const e = { name: o.name, kind: meta.kinds[k], room, floor, sub: o.name.startsWith('SUB-TX-'), parts: [],
+    const [k, room, floor, reserve, ...trs] = nodeInfo.get(o.name);
+    const e = { name: o.name, kind: meta.kinds[k], room, floor, reserve: !!reserve, trs, hidden: false, sub: o.name.startsWith('SUB-TX-'), parts: [],
       pos: new THREE.Vector3().setFromMatrixPosition(o.matrixWorld), y: 0, start: 0, end: 0, delay: 0, amount: 0, radius: 2 };
     const box = new THREE.Box3().setFromObject(o); e.radius = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2 + 2;
     const meshes = []; o.traverse(m => { if (m.isMesh) meshes.push(m); });
@@ -227,7 +215,7 @@ function liftOf(e) {
 }
 const duration = e => (e.end > 0.1 ? 1.85 : 1.25);
 function setLayer(m) {
-  layer = m; phase = 0; closeInspect();
+  layer = m; phase = 0; if (inspector) inspector.close();
   for (const e of eq) {
     const active = inLayer(e.kind, m);
     e.start = e.y; e.end = active ? liftOf(e) : 0;
@@ -252,6 +240,7 @@ function tickLayers(dt) {
     e.amount = clamp01(e.y / Math.max(1, liftOf(e)));
     e.show = e.sub || inLayer(e.kind, layer) || e.amount > 0.001 || (layer === 'construction');
     if (!open && !e.sub) e.show = false;
+    if (e.hidden) e.show = false;
   }
   for (const im of groups) {
     // only the visible instances are drawn: packed to the front, im.count = how many (vis[] maps back for picking)
@@ -307,7 +296,7 @@ function drawLabels(cam) {
   const W = innerWidth, H = innerHeight, used = [];
   const sum = $('#summary').getBoundingClientRect();
   for (const s of stages) {
-    let show = s.root.visible && s.amount > 0.8 && anchor.visible && !inspected && used.length < 4;
+    let show = s.root.visible && s.amount > 0.8 && anchor.visible && !(inspector && inspector.open) && used.length < 4;
     if (show) {
       tmpV.copy(s.label); tmpV.y += s.root.position.y;
       tmpV.applyMatrix4(s.root.parent.matrixWorld).project(cam);
@@ -324,33 +313,50 @@ function drawLabels(cam) {
   }
 }
 
-// ------------------------------------------------------------------ tap to inspect (MaketHologramInspector, level 0)
-let inspected = null;
+// ------------------------------------------------------------------ tap to inspect (inspect.js)
+let inspector = null;
 const ray = new THREE.Raycaster();
-const halo = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(
-  Array.from({ length: 48 }, (_, i) => new THREE.Vector3(Math.cos(i / 48 * Math.PI * 2), 0, Math.sin(i / 48 * Math.PI * 2)))),
-  new THREE.LineBasicMaterial({ color: 0x7de8ff, depthTest: false, transparent: true }));
-halo.renderOrder = 20; halo.visible = false;
 function inspectAt(cx, cy) {
+  if (!inspector) return;
   const cam = mode === 'ar' ? arCam : viewCam;
   ray.setFromCamera(new THREE.Vector2(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1), cam);
+  const own = ray.intersectObjects(inspector.pickables(), true).filter(h => h.object.visible && h.object.isMesh && h.object.material.opacity > 0.5);
+  if (own.length && inspector.tap(own[0].object)) { updateCard(); return; }
   const hits = ray.intersectObjects(groups.filter(g => g.visible), false).map(h => h.object.userData.vis[h.instanceId]).filter(e => e && e.show);
-  const e = hits[0];
-  if (!e) { closeInspect(); return; }
-  inspected = e;
-  const [title, body, note] = CARD[e.kind] || [e.name, ''];
-  const where = e.sub ? 'Подстанция' : e.room >= 0 ? `Зал ${String(e.room + 1).padStart(2, '0')}${e.floor ? ' · этаж 2' : ''}` : '';
-  $('#insTitle').textContent = title;
-  $('#insBody').textContent = body;
-  $('#insNote').textContent = [e.name, where, note].filter(Boolean).join(' · ');
-  $('#inspect').hidden = false;
+  if (hits[0]) { setTour(false); inspector.openUnit(hits[0]); frameInspector(true); }
+  else if (inspector.open) { inspector.close(); frameInspector(false); }
 }
-function closeInspect() { inspected = null; $('#inspect').hidden = true; halo.visible = false; }
-function tickHalo() {
-  if (!inspected) return;
-  halo.visible = true;
-  halo.position.set(inspected.pos.x, inspected.pos.y + inspected.y + 0.3, inspected.pos.z);
-  halo.scale.setScalar(inspected.radius);
+function updateCard() {
+  const c = inspector && inspector.card();
+  $('#inspect').hidden = !c;
+  if (!c) return;
+  $('#insTitle').textContent = c.title; $('#insMetric').textContent = c.metric;
+  $('#insBody').textContent = c.body; $('#insNote').textContent = c.note;
+  const lv = $('#insLevel');
+  lv.hidden = !c.canExplode || c.level < 0;
+  lv.textContent = c.level ? 'Собрать' : 'Раскрыть';
+}
+// 3D mode: fly the orbit camera to the opened unit and back
+let camGoal = null, camHome = null;
+function frameInspector(on) {
+  if (mode !== '3d' || !controls) return;
+  if (on) { if (!camHome) camHome = { target: controls.target.clone(), pos: viewCam.position.clone() }; camGoal = 'unit'; }
+  else if (camHome) camGoal = 'home';
+}
+function tickCamera(dt) {
+  if (!camGoal || mode !== '3d') return;
+  const a = 1 - Math.exp(-dt * 2.5);
+  if (camGoal === 'home') {
+    controls.target.lerp(camHome.target, a); viewCam.position.lerp(camHome.pos, a);
+    if (viewCam.position.distanceTo(camHome.pos) < 1e-4) { camGoal = null; camHome = null; }
+    return;
+  }
+  const f = inspector.focus(); if (!f) return;
+  const model = fit.children[0], c = model.localToWorld(f.center.clone());
+  const h = f.height * model.getWorldScale(new THREE.Vector3()).x;
+  const dir = viewCam.position.clone().sub(controls.target).normalize();
+  controls.target.lerp(c, a);
+  viewCam.position.lerp(c.clone().addScaledVector(dir, h * 2.6), a);
 }
 
 // ------------------------------------------------------------------ mat outline (to check the fit)
@@ -504,7 +510,7 @@ function loop() {
   frames++;
   if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
   if (touring) { tourT += dt; if (tourT > 7) { tourT = 0; tourI = (tourI + 1) % TOUR.length; setLayer(TOUR[tourI]); } }
-  tickLayers(dt); tickHalo();
+  tickLayers(dt);
   if (mode === 'ar') {
     track();
     updateProjection();
@@ -522,11 +528,14 @@ function loop() {
     $('#fovNow').textContent = vw ? `${fovOf(focalProc()).toFixed(1)}° ${S.fov > 0 ? '(вручную)' : focalSamples.length >= 8 ? '(авто)' : '(по умолчанию)'}` : '—';
     drawDebug();
     scene.updateMatrixWorld();
+    if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(new THREE.Vector3())); inspector.drawLabels(arCam); }
     drawLabels(arCam);
     renderer.render(scene, arCam);
   } else if (mode === '3d') {
+    tickCamera(dt);
     controls.update();
     scene.updateMatrixWorld();
+    if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(viewCam.position.clone())); inspector.drawLabels(viewCam); }
     drawLabels(viewCam);
     renderer.render(scene, viewCam);
     $('#stats').textContent = `${fps.toFixed(0)} к/с · ${renderer.info.render.calls} вызовов · ${(renderer.info.render.triangles / 1e6).toFixed(2)} M треуг.`;
@@ -566,6 +575,7 @@ function start3D() {
   controls = new OrbitControls(viewCam, canvas);
   controls.target.set(0, 0.01, 0);
   controls.enableDamping = true;
+  controls.addEventListener('start', () => { camGoal = null; });
   controls.minDistance = 0.05; controls.maxDistance = 2;
   controls.maxPolarAngle = Math.PI * 0.49;
   enterHud();
@@ -590,7 +600,8 @@ function initUI() {
   $('#tour').onclick = () => setTour(!touring);
   document.querySelector('#bar [data-t=settings]').onclick = () => { $('#settings').hidden = !$('#settings').hidden; };
   $('#close').onclick = () => { $('#settings').hidden = true; };
-  $('#insClose').onclick = closeInspect;
+  $('#insClose').onclick = () => { if (inspector) { inspector.close(); frameInspector(false); } };
+  $('#insLevel').onclick = () => { if (inspector && inspector.s) { inspector.setLevel(inspector.s.level ? 0 : 1); updateCard(); } };
   // tap (not drag) on the model = inspect
   let down = null;
   canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
@@ -625,7 +636,7 @@ async function main() {
   try { await modelReady; } catch (e) { console.error(e); $('#startErr').textContent = 'Ошибка загрузки модели.'; return; }
   const model = fit.children[0];
   attachStages(model);
-  model.add(halo);
+  inspector = new Inspector({ model, labels: labelsEl, onChange: updateCard });
   setLayer('overview'); reveal = 0;
   applyCalib();
   $('#btnAr').disabled = $('#btn3d').disabled = false;
@@ -637,4 +648,4 @@ main();
 
 // for debugging from the console / tests
 window.__ar = { get pose() { return pose; }, get dets() { return lastDets; }, get fps() { return fps; }, S, setLayer,
-  get layer() { return layer; }, inspectAt, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };
+  get layer() { return layer; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };
