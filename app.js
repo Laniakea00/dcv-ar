@@ -14,6 +14,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MarkerTracker, estimatePose, focalFromH } from './tracker.js';
 import { Inspector } from './inspect.js';
 import { StoryPlayer, STORIES, LAYER_STORIES, SHOW } from './story.js';
+import { Campus } from './campus.js';
 
 const $ = s => document.querySelector(s);
 const PROC = 640;            // long side of the image the tracker works on, px
@@ -25,7 +26,7 @@ const clean = n => THREE.PropertyBinding.sanitizeNodeName(n || '');
 // ------------------------------------------------------------------ layers (MaketDirector / MaketLayerMotion)
 const MODES = [
   ['overview', 'Макет'], ['compute', 'Серверы'], ['power', 'Энергия'], ['cooling', 'Охлаждение'],
-  ['network', 'Сеть'], ['continuity', 'Защита'], ['construction', 'Все системы'],
+  ['network', 'Сеть'], ['continuity', 'Защита'], ['construction', 'Все системы'], ['campus', 'Кампус'],
 ];
 const LAYER = {
   compute: ['Rack', 'StandardRack'], power: ['DRUPS', 'Transformer', 'Switchgear'],
@@ -40,6 +41,7 @@ const SUMMARY = { // QtwinModelSummary
   network: ['Сеть', 'Два направления связи', '14 шкафов · принятая компоновка'],
   continuity: ['Безопасность', '6 зон защиты', 'По одной на каждый серверный зал'],
   construction: ['Все системы', '978 единиц оборудования', 'Расчётная очередь 50 МВт'],
+  campus: ['Кампус · концепция', '50 МВт', '10 модулей × 50 МВт · генплан не утверждён'],
 };
 const TINT = { power: new THREE.Color(0.9, 0.66, 0.31), cooling: new THREE.Color(0.30, 0.68, 1) }, TINT0 = new THREE.Color(0.34, 0.84, 0.93);
 const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
@@ -81,12 +83,21 @@ anchor.add(new THREE.HemisphereLight(0xe4efff, 0x3a4048, 0.8));
 
 let meta = null;                           // model/hologram_web.json
 let modelWidth = 0.3328;                   // MaketDirector.printWidth; A4 mat: fitted to the sheet
+const moduleFit = { pos: new THREE.Vector3(), scale: 1 }, IDQ = new THREE.Quaternion();
+// fit = the module on the print, or (Кампус) the whole campus across the mat, blended while the view changes
+function blendFit() {
+  const k = campus ? campus.f * campus.f * (3 - 2 * campus.f) : 0;
+  if (k <= 0) { fit.position.copy(moduleFit.pos); fit.quaternion.identity(); fit.scale.setScalar(moduleFit.scale); return; }
+  const cf = campus.fitFor(board && mode === 'ar' ? board.sheet.w * 0.95 : 0.4);
+  fit.position.lerpVectors(moduleFit.pos, cf.pos, k); fit.quaternion.slerpQuaternions(IDQ, cf.quat, k);
+  fit.scale.setScalar(THREE.MathUtils.lerp(moduleFit.scale, cf.scale, k));
+}
 function applyFit() {
   if (!meta) return;
   const s = modelWidth / meta.site.size[0];
-  fit.scale.setScalar(s);
   // MaketDirector.FitModel: the site centre (x, z) and the bottom of the site go to the mat origin
-  fit.position.set(-meta.site.center[0] * s, -meta.site.min[1] * s, -meta.site.center[2] * s);
+  moduleFit.scale = s; moduleFit.pos.set(-meta.site.center[0] * s, -meta.site.min[1] * s, -meta.site.center[2] * s);
+  blendFit();
 }
 
 const arCam = new THREE.Camera();          // AR: fixed at the origin, projection from the phone camera intrinsics
@@ -226,13 +237,17 @@ function setLayer(m) {
   $('#sumTitle').textContent = t; $('#sumValue').textContent = v; $('#sumNote').textContent = n;
   for (const b of document.querySelectorAll('#modes button')) b.classList.toggle('on', b.dataset.m === m);
   buildChips(m);
+  if (campus) {
+    if (m === 'campus') { campus.enter(); campus.apply({ built: 10, gpp: true, lines: true, plots: false }); frameCampus(true); }
+    else if (campus.target) { campus.exit(); frameCampus(false); }
+  }
 }
 
 const tmpM = new THREE.Matrix4(), tmpV = new THREE.Vector3();
 function tickLayers(dt) {
   if (!eq.length) return;
   phase += dt; clock += dt;
-  const closed = layer === 'overview';
+  const closed = layer === 'overview' || layer === 'campus';
   reveal = closed ? Math.max(0, reveal - dt * 0.85) : Math.min(1, reveal + dt * 0.85);
   const open = reveal > 0.015;
   if (interior) interior.visible = open;
@@ -289,7 +304,7 @@ function tickLayers(dt) {
   }
 }
 function relevant(name) {
-  if (layer === 'construction' || layer === 'overview') return true;
+  if (layer === 'construction' || layer === 'overview' || layer === 'campus') return true;
   const side = name.startsWith(clean('Западный корпус')) || name.startsWith(clean('Восточный корпус'));
   return layer === 'power' ? side : !side;
 }
@@ -362,13 +377,20 @@ function tickViewOffset(dt) {
   else if (viewCam.view) viewCam.clearViewOffset();
 }
 // 3D mode: fly the orbit camera to the opened unit and back
-let camGoal = null, camHome = null;
+let camGoal = null, camHome = null, camCampus = null;
+function frameCampus(on) { if (mode === '3d' && controls) camCampus = on ? 0.66 : 0.515; }
 function frameInspector(on) {
   if (mode !== '3d' || !controls) return;
   if (on) { if (!camHome) camHome = { target: controls.target.clone(), pos: viewCam.position.clone() }; camGoal = 'unit'; }
   else if (camHome) camGoal = 'home';
 }
 function tickCamera(dt) {
+  if (camCampus && mode === '3d' && !camGoal) { // step back for the campus, forward again for the module
+    const a = 1 - Math.exp(-dt * 2.5), dir = viewCam.position.clone().sub(controls.target).normalize();
+    controls.target.lerp(new THREE.Vector3(0, camCampus > 0.6 ? 0.004 : 0.01, 0), a);
+    viewCam.position.lerp(controls.target.clone().addScaledVector(dir, camCampus), a);
+    if (Math.abs(viewCam.position.distanceTo(controls.target) - camCampus) < 1e-3) camCampus = null;
+  }
   if (!camGoal || mode !== '3d') return;
   const a = 1 - Math.exp(-dt * 2.5);
   if (camGoal === 'home') {
@@ -524,7 +546,8 @@ function drawDebug() {
 
 // ------------------------------------------------------------------ tour ("Показ")
 // ------------------------------------------------------------------ stories (story.js): "Как устроено" + ▶ Показ
-let player = null;
+let player = null, campus = null;
+const campusHide = []; // ЦОД-1's base slab and white rim: the campus has one ground
 function setTour(on) { if (!player) return; if (on) player.play(SHOW[0], SHOW.slice(1)); else if (player.queue.length || player.active) player.stop(); }
 function buildChips(m) {
   const el = $('#chips'); el.innerHTML = '';
@@ -561,6 +584,11 @@ function loop() {
   frames++;
   if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
   if (player) player.tick(dt);
+  if (campus) {
+    campus.tick(dt); blendFit();
+    for (const o of campusHide) o.visible = campus.f < 0.02;
+    if (layer === 'campus') $('#sumValue').textContent = `${campus.mw} МВт`;
+  }
   tickLayers(dt);
   if (mode === 'ar') {
     track();
@@ -581,6 +609,7 @@ function loop() {
     scene.updateMatrixWorld();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(new THREE.Vector3())); inspector.drawLabels(arCam); }
     if (player) player.drawTags(arCam);
+    if (campus) campus.drawTags(arCam);
     drawLabels(arCam);
     renderer.render(scene, arCam);
   } else if (mode === '3d') {
@@ -590,6 +619,7 @@ function loop() {
     scene.updateMatrixWorld();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(viewCam.position.clone())); inspector.drawLabels(viewCam); }
     if (player) player.drawTags(viewCam);
+    if (campus) campus.drawTags(viewCam);
     drawLabels(viewCam);
     renderer.render(scene, viewCam);
     $('#stats').textContent = `${fps.toFixed(0)} к/с · ${renderer.info.render.calls} вызовов · ${(renderer.info.render.triangles / 1e6).toFixed(2)} M треуг.`;
@@ -695,6 +725,10 @@ async function main() {
   inspector = new Inspector({ model, labels: labelsEl, onChange: updateCard });
   player = new StoryPlayer({ model, eqByName, inspector, setLayer: m => setLayer(m), labels: labelsEl, ui: storyUI,
     onFrame: e => frameInspector(!!e) });
+  let lawn = null; model.getObjectByName(clean('Газон | сплошная основа'))?.traverse(o => { if (!lawn && o.isMesh) lawn = o.material.color.clone(); });
+  let padC = null; model.getObjectByName(clean('Площадки корпусов и подстанции'))?.traverse(o => { if (!padC && o.isMesh) padC = o.material.color.clone(); });
+  campus = new Campus({ model, labels: labelsEl, grass: lawn, pad: padC }); player.campus = campus;
+  for (const n of ['Окантовка макета', 'Макет | ровное основание']) { const o = model.getObjectByName(clean(n)); if (o) campusHide.push(o); }
   setLayer('overview'); reveal = 0;
   applyCalib();
   $('#btnAr').disabled = $('#btn3d').disabled = false;
@@ -706,4 +740,4 @@ main();
 
 // for debugging from the console / tests
 window.__ar = { get pose() { return pose; }, get dets() { return lastDets; }, get fps() { return fps; }, S, setLayer,
-  get layer() { return layer; }, get player() { return player; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };
+  get layer() { return layer; }, get player() { return player; }, get campus() { return campus; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };

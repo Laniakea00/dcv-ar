@@ -75,15 +75,24 @@ export const STORIES = {
     { t: 'Сигналы сходятся к операторам', x: 'Состояние каждой зоны видно в операторском центре. Трассы показаны условно.', r: 'Иллюстрация принципа · состав системы задаёт проект', open: null, flows: [1, 2, 3, 4, 5, 6].map(i => [`FIRE-H${i}`, 'NOC-1', 'green']), focus: [['NOC-1', 'green']], tags: [['NOC-1', 'Операторский центр', 'green']], d: 6.5 },
   ] },
 };
+STORIES.campus = { name: 'Развитие до 500 МВт', layer: 'campus', steps: [
+  { t: 'ЦОД-1 · первая очередь', x: 'Проект сегодня: шесть серверных залов в центральном корпусе и два энергоблока по его длинным сторонам.', r: 'Очередь 1 · 50 МВт', campus: { built: 1, gpp: false, lines: false, plots: false }, d: 6 },
+  { t: 'Площадка на десять модулей', x: 'Модули повторяют ЦОД-1 и стоят в два ряда по пять вдоль центральной магистрали. Энергоблоки остаются по краям каждого модуля.', r: 'Концепция размещения · генплан не утверждён', campus: { built: 1, plots: true }, d: 7 },
+  { t: 'Очереди 2–5', x: 'Каждая очередь — такой же модуль на 50 МВт: свои залы, энергоблоки и распределительное устройство 35 кВ со стороны магистрали.', r: '250 МВт после пятой очереди', campus: { built: 5, plots: true }, d: 7 },
+  { t: 'Очереди 6–10', x: 'Второй ряд модулей замыкает кампус. Правый ряд зеркальный: все распределительные устройства смотрят на магистраль.', r: '10 × 50 МВт = 500 МВт', campus: { built: 10, plots: false }, d: 7 },
+  { t: 'Общая подстанция 500 кВ', x: 'Главная подстанция кампуса стоит в торце магистрали. ЦОД-1 сохраняет свою подстанцию.', r: 'ГПП · концепция', campus: { built: 10, gpp: true }, d: 6.5 },
+  { t: 'Энергия к каждому модулю', x: 'Линии идут от ГПП по инженерному коридору вдоль магистрали и ответвляются к распределительному устройству каждого модуля.', r: 'Магистраль · инженерный коридор', campus: { built: 10, gpp: true, lines: true }, d: 7 },
+  { t: 'Кампус 500 МВт', x: 'Десять модулей, общая подстанция и магистраль. «Макет» возвращает к ЦОД-1 со всеми слоями и историями.', r: '500 МВт · 10 очередей', campus: { built: 10, gpp: true, lines: true }, d: 7 },
+] };
 export const LAYER_STORIES = {
   compute: ['server', 'compute'], power: ['energy', 'gridloss', 'powerpath'], cooling: ['heat', 'coolreserve'],
   network: ['network', 'compute'], continuity: ['safety'], construction: ['server', 'energy', 'heat'],
-  overview: ['server', 'energy', 'heat'],
+  overview: ['campus', 'server', 'energy'], campus: ['campus'],
 };
-export const SHOW = ['server', 'energy', 'heat', 'network', 'safety']; // ▶ Показ: all of them in a row
+export const SHOW = ['server', 'energy', 'heat', 'network', 'safety', 'campus']; // ▶ Показ: all of them in a row
 
 // ------------------------------------------------------------------ light routes
-function tubeMaterial(color, fault, rev) {
+export function tubeMaterial(color, fault, rev) {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false,
     uniforms: { time: { value: 0 }, grow: { value: 0 }, fade: { value: 0 }, color: { value: color.clone() }, fault: { value: fault ? 1 : 0 }, dir: { value: rev ? -1 : 1 } },
@@ -146,6 +155,7 @@ export class StoryPlayer {
     for (const [a, b, col, mode] of step.flows || []) this.addFlow(a, b, col, mode === 'fault', mode === 'rev');
     for (const f of step.focus || []) this.addRing(...(Array.isArray(f) ? f : [f, 'blue']));
     for (const [u, text, col] of step.tags || []) this.addTag(u, text, col || 'blue');
+    if (step.campus && this.campus) this.campus.apply(step.campus);
     // the inspected unit: the state this step implies (the last "open" at or before it, so ◀ / ▶ jumps stay consistent)
     let want = { open: undefined };
     for (let k = 0; k <= i; k++) { const s = st.steps[k]; if ('open' in s) want = { open: s.open, level: s.level, tray: s.tray }; else { if (s.level !== undefined) want.level = s.level; if (s.tray) want.tray = s.tray; } }
