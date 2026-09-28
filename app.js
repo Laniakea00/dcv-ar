@@ -3,6 +3,7 @@
 // Without a camera (or on a desktop) the same model is shown in a plain 3D viewer.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { MarkerTracker, estimatePose, focalFromH } from './tracker.js';
@@ -12,14 +13,15 @@ const PROC = 640;            // long side of the image the tracker works on, px
 const DEFAULT_FOV = 65;      // typical phone main camera, along the long side of the frame, degrees
 const LOST_MS = 700;         // keep the model this long after the mat is lost
 
-// DcvStand.cs: building-shell bbox in the glb (glTF frame) and the maket.obj bbox (metres); the fit maps one onto the other
-const GLB_MIN = [74.90, 0.15, -404.63], GLB_MAX = [469.10, 30.75, -155.88];
+// DcvStand.cs (model v5 from UE, app/modeltarget/dcv/DCV_Stand_v5_UE*.glb): bbox of the shell nodes DCV_Сэндвич_AI +
+// DCV_Сэндвич_EC in the glb (glTF frame) and the maket.obj bbox (metres); the fit maps one box onto the other per axis
+const GLB_MIN = [-384.52, -0.01, -210.19], GLB_MAX = [49.45, 16.44, -1.55];
 const MAKET_MIN = [-0.09107, 0, -0.05726], MAKET_MAX = [0.09107, 0.0134, 0.05726];
 
 const SITE = ['Грунт', 'Газон', 'Асфальт', 'Тротуар', 'Бетон площадка', 'Ограждение'];
 const KINDS = [ // first match wins, the rest is shell (DcvStand.Kinds)
   ['racks', 0x4dd966, ['Стойка']],
-  ['cooling', 0x3d9bff, ['CDU', 'CRAH', 'Pipes', 'Насос', 'ПТО', 'Чиллер']],
+  ['cooling', 0x3d9bff, ['CDU', 'CRAH', 'Pipes', 'Насос', 'ПТО', 'Чиллер', 'Резервуар']],
   ['power', 0xff9a2e, ['RPP', 'DRUPS', 'Трансформатор', 'КРУ', 'UPS', 'MSB', 'ГРЩ', 'Switchgear', 'Бак_топлива']],
   ['cables', 0xff4d4d, ['Cable']],
   ['structure', 0x9aa4ad, ['Фальшпол', 'Колонна', 'Контейнер', 'LED']],
@@ -76,7 +78,7 @@ const parts = [];                          // {mesh, kind, color, mat0}
 let model = null;
 const loadFill = $('#loadFill'), loadText = $('#loadText');
 const modelReady = new Promise((resolve, reject) => {
-  new GLTFLoader().load('model/dcv_web.glb', gltf => {
+  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load('model/dcv_web.glb', gltf => {
     model = gltf.scene;
     model.traverse(o => {
       if (!o.isMesh) return;
