@@ -41,7 +41,7 @@ const SUMMARY = { // QtwinModelSummary
   network: ['Сеть', 'Два направления связи', '14 шкафов · принятая компоновка'],
   continuity: ['Безопасность', '6 зон защиты', 'По одной на каждый серверный зал'],
   construction: ['Все системы', '978 единиц оборудования', 'Расчётная очередь 50 МВт'],
-  campus: ['Кампус · концепция', '50 МВт', '10 модулей × 50 МВт · генплан не утверждён'],
+  campus: ['Кампус · по генплану', '50 МВт', '10 модулей × 50 МВт · очереди 3–10 — концепция'],
 };
 const TINT = { power: new THREE.Color(0.9, 0.66, 0.31), cooling: new THREE.Color(0.30, 0.68, 1) }, TINT0 = new THREE.Color(0.34, 0.84, 0.93);
 const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
@@ -88,7 +88,7 @@ const moduleFit = { pos: new THREE.Vector3(), scale: 1 }, IDQ = new THREE.Quater
 function blendFit() {
   const k = campus ? campus.f * campus.f * (3 - 2 * campus.f) : 0;
   if (k <= 0) { fit.position.copy(moduleFit.pos); fit.quaternion.identity(); fit.scale.setScalar(moduleFit.scale); return; }
-  const cf = campus.fitFor(board && mode === 'ar' ? board.sheet.w * 0.95 : 0.4);
+  const cf = board && mode === 'ar' ? campus.fitFor(board.sheet.w * 0.95, board.sheet.h * 0.95) : campus.fitFor(0.4, 0.34);
   fit.position.lerpVectors(moduleFit.pos, cf.pos, k); fit.quaternion.slerpQuaternions(IDQ, cf.quat, k);
   fit.scale.setScalar(THREE.MathUtils.lerp(moduleFit.scale, cf.scale, k));
 }
@@ -238,7 +238,7 @@ function setLayer(m) {
   for (const b of document.querySelectorAll('#modes button')) b.classList.toggle('on', b.dataset.m === m);
   buildChips(m);
   if (campus) {
-    if (m === 'campus') { campus.enter(); campus.apply({ built: 10, gpp: true, lines: true, plots: false }); frameCampus(true); }
+    if (m === 'campus') { campus.enter(); campus.apply({ built: 10, gpp: true, lines: true, plots: false, infra: true }); frameCampus(true); }
     else if (campus.target) { campus.exit(); frameCampus(false); }
   }
 }
@@ -259,6 +259,7 @@ function tickLayers(dt) {
     if (!open && !e.sub) e.show = false;
     if (e.pinned && !e.hidden) e.show = true; // units a story route or ring points at
     if (e.hidden) e.show = false;
+    if (e.sub && campusAway) e.show = false; // ЦОД-1's substation equipment: the campus has «Станция понижения»
   }
   for (const im of groups) {
     // only the visible instances are drawn: packed to the front, im.count = how many (vis[] maps back for picking)
@@ -378,7 +379,8 @@ function tickViewOffset(dt) {
 }
 // 3D mode: fly the orbit camera to the opened unit and back
 let camGoal = null, camHome = null, camCampus = null;
-function frameCampus(on) { if (mode === '3d' && controls) camCampus = on ? 0.66 : 0.515; }
+// the site is almost square: on a portrait phone the camera steps back further so it fits the width
+function frameCampus(on) { if (mode === '3d' && controls) camCampus = on ? 0.66 * THREE.MathUtils.clamp(0.6 / viewCam.aspect, 1, 1.6) : 0.515; }
 function frameInspector(on) {
   if (mode !== '3d' || !controls) return;
   if (on) { if (!camHome) camHome = { target: controls.target.clone(), pos: viewCam.position.clone() }; camGoal = 'unit'; }
@@ -547,7 +549,9 @@ function drawDebug() {
 // ------------------------------------------------------------------ tour ("Показ")
 // ------------------------------------------------------------------ stories (story.js): "Как устроено" + ▶ Показ
 let player = null, campus = null;
-const campusHide = []; // ЦОД-1's base slab and white rim: the campus has one ground
+const campusHide = []; // parts of ЦОД-1's maket the campus replaces (see main)
+const campusShow = []; // ... and what stands in for them there
+let campusAway = false;
 function setTour(on) { if (!player) return; if (on) player.play(SHOW[0], SHOW.slice(1)); else if (player.queue.length || player.active) player.stop(); }
 function buildChips(m) {
   const el = $('#chips'); el.innerHTML = '';
@@ -586,7 +590,8 @@ function loop() {
   if (player) player.tick(dt);
   if (campus) {
     campus.tick(dt); blendFit();
-    for (const o of campusHide) o.visible = campus.f < 0.02;
+    const away = campus.f >= 0.02;
+    if (away !== campusAway) { campusAway = away; for (const o of campusHide) o.visible = !away; for (const o of campusShow) o.visible = away; }
     if (layer === 'campus') $('#sumValue').textContent = `${campus.mw} МВт`;
   }
   tickLayers(dt);
@@ -727,8 +732,42 @@ async function main() {
     onFrame: e => frameInspector(!!e) });
   let lawn = null; model.getObjectByName(clean('Газон | сплошная основа'))?.traverse(o => { if (!lawn && o.isMesh) lawn = o.material.color.clone(); });
   let padC = null; model.getObjectByName(clean('Площадки корпусов и подстанции'))?.traverse(o => { if (!padC && o.isMesh) padC = o.material.color.clone(); });
-  campus = new Campus({ model, labels: labelsEl, grass: lawn, pad: padC }); player.campus = campus;
-  for (const n of ['Окантовка макета', 'Макет | ровное основание']) { const o = model.getObjectByName(clean(n)); if (o) campusHide.push(o); }
+  let roadC = null; model.getObjectByName(clean('Дороги | ровное асфальтовое покрытие'))?.traverse(o => { if (!roadC && o.isMesh) roadC = o.material.color.clone(); });
+  campus = new Campus({ model, labels: labelsEl, grass: lawn, pad: padC, road: roadC }); player.campus = campus;
+  // in the campus ЦОД-1 stands on the генплан: no base slab, rim or lawn of the maket, and no substation of its own
+  // (the site has «Станция понижения»; ЦОД-2 takes that place); its trees and lamps outside its tile make way too
+  const ext = model.getObjectByName(clean('Maket Clean exterior')), c = new THREE.Vector3();
+  const chain = o => { const M = new THREE.Matrix4(); for (let q = o; q && q !== model; q = q.parent) M.premultiply(q.matrix); return M; }; // object -> module frame
+  for (const o of ext ? ext.children : []) {
+    const n = o.name;
+    let hide = /^(Окантовка_макета|Макет_\|_ровное_основание|Газон|Подстанция|Промежуточный_портал|Ячейка_высокого_напряжения)/.test(n);
+    const part = o.isMesh ? o : o.children.find(k => k.isMesh);
+    if (!hide && /^(Дерево|Кустарник|Фонарь)/.test(n) && part) {
+      part.geometry.computeBoundingBox(); part.geometry.boundingBox.getCenter(c).applyMatrix4(chain(part));
+      hide = c.x > 236.5 || c.z < -247 || c.z > 284.5;
+    }
+    if (hide) campusHide.push(o);
+    // the pads mesh also carries the substation yard: in the campus it is swapped for a copy without it
+    if (n.startsWith('Площадки_корпусов')) o.traverse(m => {
+      if (!m.isMesh) return;
+      const toModel = chain(m);
+      // cut the triangles at x = 188 of the module frame (the yard starts at 196), in floats
+      const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry, p = g.attributes.position, nrm = g.attributes.normal;
+      const back = toModel.clone().invert(), P = [], N = [], X = 188;
+      const vtx = i => ({ p: new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(toModel), n: nrm ? new THREE.Vector3().fromBufferAttribute(nrm, i) : null });
+      const mix = (a, b, f) => ({ p: a.p.clone().lerp(b.p, f), n: a.n ? a.n.clone().lerp(b.n, f) : null });
+      for (let i = 0; i < p.count; i += 3) {
+        const tri = [vtx(i), vtx(i + 1), vtx(i + 2)], poly = [];
+        tri.forEach((a, k) => { const b = tri[(k + 1) % 3], ia = a.p.x <= X, ib = b.p.x <= X; if (ia) poly.push(a); if (ia !== ib) poly.push(mix(a, b, (X - a.p.x) / (b.p.x - a.p.x))); });
+        for (let k = 1; k + 1 < poly.length; k++) for (const v of [poly[0], poly[k], poly[k + 1]]) { const q = v.p.clone().applyMatrix4(back); P.push(q.x, q.y, q.z); if (v.n) N.push(v.n.x, v.n.y, v.n.z); }
+      }
+      const out = new THREE.BufferGeometry();
+      out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      if (N.length) out.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      const copy = new THREE.Mesh(out, m.material); copy.matrixAutoUpdate = false; copy.matrix.copy(m.matrix); copy.receiveShadow = true; copy.visible = false;
+      m.parent.add(copy); campusHide.push(m); campusShow.push(copy);
+    });
+  }
   setLayer('overview'); reveal = 0;
   applyCalib();
   $('#btnAr').disabled = $('#btn3d').disabled = false;

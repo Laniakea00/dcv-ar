@@ -86,4 +86,5 @@ label.check { display: flex; gap: 8px; align-items: center; }
 .tag.story { border-width: 1px 1px 1px 3px; font-size: 12px; }
 @media (min-width: 900px) { #story { left: auto; right: 16px; width: 380px; bottom: auto; top: 16px; margin: 0; } }
 .tag.campus { font-size: 11px; padding: 2px 7px; border-color: rgba(255, 255, 255, .25); }
+.tag.campus.infra { color: #d6e4ee; border-color: rgba(255, 190, 120, .55); }
 .tag.campus.first { border-color: var(--accent); color: #eafffa; font-weight: 600; }
