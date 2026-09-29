@@ -76,21 +76,33 @@ export const STORIES = {
   ] },
 };
 STORIES.campus = { name: 'Развитие до 500 МВт', layer: 'campus', steps: [
-  { t: 'ЦОД-1 · первая очередь', x: 'Проект сегодня: шесть серверных залов в центральном корпусе и два энергоблока по его длинным сторонам. На генплане это кластер первой очереди у западного въезда.', r: 'Очередь 1 · 50 МВт', campus: { built: 1, gpp: false, lines: false, plots: false, infra: false }, d: 6.5 },
-  { t: 'Генплан площадки', x: 'Ограждение, дороги и два КПП; на западе — водопроводные сооружения и ЛОС, на восточной границе — участок станции понижения. Сетка дорог делит площадку на участки под модули.', r: 'Разбивочный план М1:2000', campus: { built: 1, plots: true, infra: true }, d: 7.5 },
-  { t: 'Вторая очередь', x: 'ЦОД-2 встаёт рядом с ЦОД-1 — на месте второй очереди строительства по генплану. Подстанция макета здесь не нужна: питание даёт станция понижения.', r: '100 МВт', campus: { built: 2, plots: true, infra: true }, d: 7 },
-  { t: 'Очереди 3–6', x: 'Такие же модули на 50 МВт занимают участки сетки к востоку и югу. Энергоблоки остаются по длинным сторонам каждого корпуса.', r: '300 МВт после шестой очереди · концепция', campus: { built: 6, plots: true, infra: true }, d: 7 },
-  { t: 'Очереди 7–10', x: 'Северный ряд и южный край площадки замыкают кампус. Все модули в одной сетке дорог генплана.', r: '10 × 50 МВт = 500 МВт', campus: { built: 10, plots: false, infra: true }, d: 7 },
-  { t: 'Станция понижения', x: 'Две воздушные линии с востока приходят на станцию понижения у границы площадки. Пунктир — её участок по генплану, с запасом на расширение.', r: 'Станция понижения · генплан', campus: { built: 10, gpp: true, infra: true }, d: 7 },
-  { t: 'Энергия к каждому модулю', x: 'От станции две магистрали идут вдоль дорог на север и на юг и ответвляются к распределительному устройству 35 кВ каждого модуля.', r: 'Фидеры по дорогам', campus: { built: 10, gpp: true, lines: true, infra: true }, d: 7.5 },
-  { t: 'Кампус 500 МВт', x: 'Десять модулей, станция понижения и инженерные сооружения на одной площадке. «Макет» возвращает к ЦОД-1 со всеми слоями и историями.', r: '500 МВт · 10 очередей', campus: { built: 10, gpp: true, lines: true, infra: true }, d: 7 },
+  { t: 'ЦОД-1 · первая очередь', x: 'Проект сегодня: шесть серверных залов в центральном корпусе и два энергоблока по его длинным сторонам. На макете это модуль у западного въезда, с административным корпусом.', r: 'Очередь 1 · 50 МВт', campus: { built: 1, gpp: false, lines: false, plots: false, infra: false }, d: 6.5 },
+  { t: 'Площадка по макету', x: 'Четыре ряда модулей между дорогами, на западе — водопроводные сооружения и ЛОС, на востоке — энергоцентр. Подсвечены участки будущих модулей.', r: 'Новый макет кампуса', campus: { built: 1, plots: true, infra: true }, d: 7.5 },
+  { t: 'Вторая очередь', x: 'ЦОД-2 встаёт рядом с ЦОД-1, в том же ряду.', r: '100 МВт', campus: { built: 2, plots: true, infra: true }, d: 6 },
+  { t: 'Очереди 3–6', x: 'Два южных ряда: такие же модули на 50 МВт, энергоблоки по длинным сторонам каждого корпуса.', r: '300 МВт после шестой очереди', campus: { built: 6, plots: true, infra: true }, d: 7 },
+  { t: 'Очереди 7–10', x: 'Восточные модули южных рядов и северный ряд замыкают кампус. На востоке рядов — два полумодуля, как на макете.', r: '10 × 50 МВт = 500 МВт', campus: { built: 12, plots: false, infra: true }, d: 7.5 },
+  { t: 'Энергоцентр', x: 'На востоке площадки — энергоцентр с двумя высокими трубами, как на макете.', r: 'Энергоцентр · по макету', campus: { built: 12, gpp: true, infra: true }, d: 6.5 },
+  { t: 'Энергия к каждому модулю', x: 'От энергоцентра магистраль идёт по средней дороге и расходится по дорогам между рядами к каждому модулю.', r: 'Фидеры по дорогам', campus: { built: 12, gpp: true, lines: true, infra: true }, d: 7.5 },
+  { t: 'Кампус 500 МВт', x: 'Десять модулей, энергоцентр и инженерные сооружения на одной площадке. «Макет» возвращает к ЦОД-1 со всеми слоями и историями.', r: '500 МВт · 10 очередей', campus: { built: 12, gpp: true, lines: true, infra: true }, d: 7 },
+] };
+STORIES.build4d = { name: '4D · строительство', layer: '4d', steps: [
+  { t: 'Площадка', x: 'Разбивка осей: контур корпусов выносится на местность, под первую очередь роют котлован.', r: 'Месяцы 1–2', build: 'site', d: 5 },
+  { t: 'Фундаменты и плиты', x: 'Бетонируются плиты, цоколи и перекрытия залов. Светящаяся линия — фронт работ.', r: 'Месяцы 3–5', build: 'found', d: 5.5 },
+  { t: 'Каркас и оболочка', x: 'Стены, колонны и кровли растут волной с запада на восток. Корпус показан прозрачным, чтобы было видно, что внутри.', r: 'Месяцы 6–11', build: 'walls', d: 8 },
+  { t: 'Энергетика', x: 'В энергоблоки опускаются DRUPS, трансформаторы и распределительные устройства — линии A / B / C / D.', r: 'Месяцы 12–14 · 24 DRUPS', build: 'power', d: 6.5 },
+  { t: 'Охлаждение', x: 'CDU и CRAH встают в залы, чиллеры и сухие охладители — на второй уровень.', r: 'Месяцы 15–17 · 260 единиц', build: 'cooling', d: 6.5 },
+  { t: 'Серверные залы', x: 'Шесть залов заполняются стойками, зал за залом: 308 AI-стоек и 300 стандартных.', r: 'Месяцы 18–21 · 608 стоек', build: 'racks', d: 8 },
+  { t: 'Сеть и пусконаладка', x: 'Сеть, пожаротушение и диспетчерская. Стойки включаются — по залам идёт волна пусконаладки.', r: 'Месяцы 22–23', build: 'network', d: 6.5 },
+  { t: 'Корпус закрывается', x: 'Оболочка становится непрозрачной: ЦОД-1 на 50 МВт введён в эксплуатацию.', r: 'Месяц 24 · 50 МВт', build: 'close', d: 5 },
+  { t: 'Следующие очереди', x: 'ЦОД-2…10 и два полумодуля строятся по тому же сценарию, только быстрее: прозрачный корпус, оборудование внутри, закрытие.', r: 'Очереди 2–10 · по макету', layer: 'campus', build: 'campus', campus: { built: 12, gpp: true, infra: true, lines: false, plots: false }, d: 16 },
+  { t: 'Кампус 500 МВт', x: 'Десять модулей, энергоцентр и питание к каждому модулю. «Макет» возвращает к ЦОД-1.', r: '10 × 50 МВт', layer: 'campus', build: 'done', campus: { built: 12, gpp: true, infra: true, lines: true }, d: 7 },
 ] };
 export const LAYER_STORIES = {
   compute: ['server', 'compute'], power: ['energy', 'gridloss', 'powerpath'], cooling: ['heat', 'coolreserve'],
-  network: ['network', 'compute'], continuity: ['safety'], construction: ['server', 'energy', 'heat'],
-  overview: ['campus', 'server', 'energy'], campus: ['campus'],
+  network: ['network', 'compute'], continuity: ['safety'], construction: ['build4d', 'server', 'energy'],
+  overview: ['build4d', 'campus', 'server'], campus: ['campus', 'build4d'], '4d': ['build4d'],
 };
-export const SHOW = ['server', 'energy', 'heat', 'network', 'safety', 'campus']; // ▶ Показ: all of them in a row
+export const SHOW = ['build4d', 'server', 'energy', 'heat', 'network', 'safety', 'campus']; // ▶ Показ: all of them in a row
 
 // ------------------------------------------------------------------ light routes
 export function tubeMaterial(color, fault, rev) {
@@ -125,13 +137,14 @@ export class StoryPlayer {
     this.stop(true);
     const st = STORIES[id]; if (!st) return;
     this.story = { id, ...st }; this.queue = queue; this.i = -1; this.paused = false;
-    this.setLayer(st.layer, true);
+    this.setLayer(st.layer, true); this.layerNow = st.layer;
     this.go(0);
     this.ui.show(this);
   }
   stop(silent) {
     if (!this.story) return;
     this.clear(); this.unpinAll();
+    if (this.build) this.build.stop();
     this.inspector.fx = { rotor: 1, engine: false };
     if (this.inspector.open) this.inspector.close();
     this.onFrame(null);
@@ -156,7 +169,11 @@ export class StoryPlayer {
     for (const [a, b, col, mode] of step.flows || []) this.addFlow(a, b, col, mode === 'fault', mode === 'rev');
     for (const f of step.focus || []) this.addRing(...(Array.isArray(f) ? f : [f, 'blue']));
     for (const [u, text, col] of step.tags || []) this.addTag(u, text, col || 'blue');
+    // a step may move to another layer (4D: the module, then the campus); ◀ / ▶ keep it consistent
+    let lay = st.layer; for (let k = 0; k <= i; k++) if (st.steps[k].layer) lay = st.steps[k].layer;
+    if (lay !== this.layerNow) { this.layerNow = lay; this.setLayer(lay, true); }
     if (step.campus && this.campus) this.campus.apply(step.campus);
+    if (this.build) { if (step.build) this.build.apply(step.build, step.d); else if (this.build.phase) this.build.stop(); }
     // the inspected unit: the state this step implies (the last "open" at or before it, so ◀ / ▶ jumps stay consistent)
     let want = { open: undefined };
     for (let k = 0; k <= i; k++) { const s = st.steps[k]; if ('open' in s) want = { open: s.open, level: s.level, tray: s.tray }; else { if (s.level !== undefined) want.level = s.level; if (s.tray) want.tray = s.tray; } }

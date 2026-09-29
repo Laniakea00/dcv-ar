@@ -15,6 +15,7 @@ import { MarkerTracker, estimatePose, focalFromH } from './tracker.js';
 import { Inspector } from './inspect.js';
 import { StoryPlayer, STORIES, LAYER_STORIES, SHOW } from './story.js';
 import { Campus } from './campus.js';
+import { Build4D } from './build4d.js';
 
 const $ = s => document.querySelector(s);
 const PROC = 640;            // long side of the image the tracker works on, px
@@ -41,7 +42,8 @@ const SUMMARY = { // QtwinModelSummary
   network: ['Сеть', 'Два направления связи', '14 шкафов · принятая компоновка'],
   continuity: ['Безопасность', '6 зон защиты', 'По одной на каждый серверный зал'],
   construction: ['Все системы', '978 единиц оборудования', 'Расчётная очередь 50 МВт'],
-  campus: ['Кампус · по генплану', '50 МВт', '10 модулей × 50 МВт · очереди 3–10 — концепция'],
+  campus: ['Кампус · по макету', '50 МВт', '10 модулей × 50 МВт + 2 полумодуля · раскладка нового макета'],
+  '4d': ['4D · строительство', 'Месяц 1 из 24', 'Схема последовательности · не график работ'],
 };
 const TINT = { power: new THREE.Color(0.9, 0.66, 0.31), cooling: new THREE.Color(0.30, 0.68, 1) }, TINT0 = new THREE.Color(0.34, 0.84, 0.93);
 const ease = t => t * t * t * (t * (t * 6 - 15) + 10);
@@ -62,6 +64,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.NeutralToneMapping;
 renderer.setClearColor(0x000000, 0);
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true;       // «4D · строительство»: the rising cut
 const scene = new THREE.Scene();
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.75;
@@ -227,7 +230,10 @@ function liftOf(e) {
 }
 const duration = e => (e.end > 0.1 ? 1.85 : 1.25);
 function setLayer(m) {
+  const was = layer;
   layer = m; phase = 0; if (inspector) inspector.close();
+  // 4D: the camera comes a bit closer to the building site, and goes back after
+  if (mode === '3d' && controls && m !== 'campus') { if (m === '4d') camCampus = 0.4 * THREE.MathUtils.clamp(0.6 / viewCam.aspect, 1, 1.35); else if (was === '4d') camCampus = 0.515; }
   for (const e of eq) {
     const active = inLayer(e.kind, m);
     e.start = e.y; e.end = active ? liftOf(e) : 0;
@@ -238,7 +244,7 @@ function setLayer(m) {
   for (const b of document.querySelectorAll('#modes button')) b.classList.toggle('on', b.dataset.m === m);
   buildChips(m);
   if (campus) {
-    if (m === 'campus') { campus.enter(); campus.apply({ built: 10, gpp: true, lines: true, plots: false, infra: true }); frameCampus(true); }
+    if (m === 'campus') { campus.enter(); campus.apply({ built: 12, gpp: true, lines: true, plots: false, infra: true }); frameCampus(true); }
     else if (campus.target) { campus.exit(); frameCampus(false); }
   }
 }
@@ -248,6 +254,7 @@ function tickLayers(dt) {
   if (!eq.length) return;
   phase += dt; clock += dt;
   const closed = layer === 'overview' || layer === 'campus';
+  const b4 = !!(build && build.active);
   reveal = closed ? Math.max(0, reveal - dt * 0.85) : Math.min(1, reveal + dt * 0.85);
   const open = reveal > 0.015;
   if (interior) interior.visible = open;
@@ -260,6 +267,7 @@ function tickLayers(dt) {
     if (e.pinned && !e.hidden) e.show = true; // units a story route or ring points at
     if (e.hidden) e.show = false;
     if (e.sub && campusAway) e.show = false; // ЦОД-1's substation equipment: the campus has «Станция понижения»
+    if (b4) build.eqState(e);                // 4D: the unit comes down into place when its system is built
   }
   for (const im of groups) {
     // only the visible instances are drawn: packed to the front, im.count = how many (vis[] maps back for picking)
@@ -268,26 +276,27 @@ function tickLayers(dt) {
     for (let i = 0; i < owners.length; i++) {
       const e = owners[i];
       if (!e.show) continue;
-      tmpM.makeTranslation(0, e.y, 0).multiply(base[i]);
+      tmpM.makeTranslation(0, e.y + (b4 ? e.drop : 0), 0).multiply(base[i]);
       im.setMatrixAt(k, tmpM); vis[k++] = e;
     }
     im.count = k; im.visible = k > 0;
     im.instanceMatrix.needsUpdate = true; im.boundingSphere = null;
     const glow = inLayer(im.userData.kind, layer) && layer !== 'overview';
-    const strength = glow ? (phase > 3.2 ? 0.12 : 0.52) : 0;
+    const g4 = b4 ? build.groupGlow(im.userData.kind) : null;
+    const strength = g4 ? g4[1] : glow ? (phase > 3.2 ? 0.12 : 0.52) : 0;
     const m = im.material;
     if (m.emissive) {
-      if (strength > 0) { m.emissive.copy(TINT[layer] || TINT0); m.emissiveIntensity = strength; }
+      if (strength > 0) { m.emissive.copy(g4 ? g4[0] : TINT[layer] || TINT0); m.emissiveIntensity = strength; }
       else { m.emissive.copy(im.userData.em0); m.emissiveIntensity = im.userData.ei0; }
     }
   }
-  for (const s of shell) {
+  if (!b4) for (const s of shell) { // (4D gives the shell its own materials)
     const want = open && relevant(s.name) ? ghostMat : s.orig;
     if (s.mesh.material !== want) { s.mesh.material = want; s.mesh.castShadow = want === s.orig; }
   }
-  const lift = smoothstep(0, 10, reveal);
+  const lift = b4 ? 0 : smoothstep(0, 10, reveal);
   for (const r of roofs) r.obj.position.y = r.home + (relevant(r.name) ? lift / r.k : 0);
-  for (const o of context) o.visible = layer === 'construction';
+  for (const o of context) o.visible = b4 ? build.slabs : layer === 'construction';
   // decks follow their members
   for (const s of stages) {
     const n = s.members.length;
@@ -548,7 +557,7 @@ function drawDebug() {
 
 // ------------------------------------------------------------------ tour ("Показ")
 // ------------------------------------------------------------------ stories (story.js): "Как устроено" + ▶ Показ
-let player = null, campus = null;
+let player = null, campus = null, build = null;
 const campusHide = []; // parts of ЦОД-1's maket the campus replaces (see main)
 const campusShow = []; // ... and what stands in for them there
 let campusAway = false;
@@ -588,11 +597,12 @@ function loop() {
   frames++;
   if (now - fpsT > 1000) { fps = frames * 1000 / (now - fpsT); frames = 0; fpsT = now; }
   if (player) player.tick(dt);
+  if (build) { build.tick(dt); if (build.label && layer === '4d') $('#sumValue').textContent = build.label; }
   if (campus) {
     campus.tick(dt); blendFit();
     const away = campus.f >= 0.02;
     if (away !== campusAway) { campusAway = away; for (const o of campusHide) o.visible = !away; for (const o of campusShow) o.visible = away; }
-    if (layer === 'campus') $('#sumValue').textContent = `${campus.mw} МВт`;
+    if (layer === 'campus') $('#sumValue').textContent = build && build.phase === 'campus' ? `${campus.mw} МВт · строится` : `${campus.mw} МВт`;
   }
   tickLayers(dt);
   if (mode === 'ar') {
@@ -612,6 +622,7 @@ function loop() {
     $('#fovNow').textContent = vw ? `${fovOf(focalProc()).toFixed(1)}° ${S.fov > 0 ? '(вручную)' : focalSamples.length >= 8 ? '(авто)' : '(по умолчанию)'}` : '—';
     drawDebug();
     scene.updateMatrixWorld();
+    if (build) build.prerender(); if (campus) campus.prerender();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(new THREE.Vector3())); inspector.drawLabels(arCam); }
     if (player) player.drawTags(arCam);
     if (campus) campus.drawTags(arCam);
@@ -622,6 +633,7 @@ function loop() {
     tickViewOffset(dt);
     controls.update();
     scene.updateMatrixWorld();
+    if (build) build.prerender(); if (campus) campus.prerender();
     if (inspector) { inspector.tick(dt, fit.children[0].worldToLocal(viewCam.position.clone())); inspector.drawLabels(viewCam); }
     if (player) player.drawTags(viewCam);
     if (campus) campus.drawTags(viewCam);
@@ -734,40 +746,12 @@ async function main() {
   let padC = null; model.getObjectByName(clean('Площадки корпусов и подстанции'))?.traverse(o => { if (!padC && o.isMesh) padC = o.material.color.clone(); });
   let roadC = null; model.getObjectByName(clean('Дороги | ровное асфальтовое покрытие'))?.traverse(o => { if (!roadC && o.isMesh) roadC = o.material.color.clone(); });
   campus = new Campus({ model, labels: labelsEl, grass: lawn, pad: padC, road: roadC }); player.campus = campus;
-  // in the campus ЦОД-1 stands on the генплан: no base slab, rim or lawn of the maket, and no substation of its own
-  // (the site has «Станция понижения»; ЦОД-2 takes that place); its trees and lamps outside its tile make way too
-  const ext = model.getObjectByName(clean('Maket Clean exterior')), c = new THREE.Vector3();
-  const chain = o => { const M = new THREE.Matrix4(); for (let q = o; q && q !== model; q = q.parent) M.premultiply(q.matrix); return M; }; // object -> module frame
-  for (const o of ext ? ext.children : []) {
-    const n = o.name;
-    let hide = /^(Окантовка_макета|Макет_\|_ровное_основание|Газон|Подстанция|Промежуточный_портал|Ячейка_высокого_напряжения)/.test(n);
-    const part = o.isMesh ? o : o.children.find(k => k.isMesh);
-    if (!hide && /^(Дерево|Кустарник|Фонарь)/.test(n) && part) {
-      part.geometry.computeBoundingBox(); part.geometry.boundingBox.getCenter(c).applyMatrix4(chain(part));
-      hide = c.x > 236.5 || c.z < -247 || c.z > 284.5;
-    }
-    if (hide) campusHide.push(o);
-    // the pads mesh also carries the substation yard: in the campus it is swapped for a copy without it
-    if (n.startsWith('Площадки_корпусов')) o.traverse(m => {
-      if (!m.isMesh) return;
-      const toModel = chain(m);
-      // cut the triangles at x = 188 of the module frame (the yard starts at 196), in floats
-      const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry, p = g.attributes.position, nrm = g.attributes.normal;
-      const back = toModel.clone().invert(), P = [], N = [], X = 188;
-      const vtx = i => ({ p: new THREE.Vector3().fromBufferAttribute(p, i).applyMatrix4(toModel), n: nrm ? new THREE.Vector3().fromBufferAttribute(nrm, i) : null });
-      const mix = (a, b, f) => ({ p: a.p.clone().lerp(b.p, f), n: a.n ? a.n.clone().lerp(b.n, f) : null });
-      for (let i = 0; i < p.count; i += 3) {
-        const tri = [vtx(i), vtx(i + 1), vtx(i + 2)], poly = [];
-        tri.forEach((a, k) => { const b = tri[(k + 1) % 3], ia = a.p.x <= X, ib = b.p.x <= X; if (ia) poly.push(a); if (ia !== ib) poly.push(mix(a, b, (X - a.p.x) / (b.p.x - a.p.x))); });
-        for (let k = 1; k + 1 < poly.length; k++) for (const v of [poly[0], poly[k], poly[k + 1]]) { const q = v.p.clone().applyMatrix4(back); P.push(q.x, q.y, q.z); if (v.n) N.push(v.n.x, v.n.y, v.n.z); }
-      }
-      const out = new THREE.BufferGeometry();
-      out.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-      if (N.length) out.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
-      const copy = new THREE.Mesh(out, m.material); copy.matrixAutoUpdate = false; copy.matrix.copy(m.matrix); copy.receiveShadow = true; copy.visible = false;
-      m.parent.add(copy); campusHide.push(m); campusShow.push(copy);
-    });
-  }
+  build = new Build4D({ model, eq, groups, context, campus }); player.build = build;
+  // in the campus ЦОД-1 stands on module B1 of the new maket like the other modules: its buildings, the admin building and
+  // the galleries only (no base slab, rim, lawn, roads, pads, trees, lamps or substation yard of the ЦОД-1 maket)
+  const ext = model.getObjectByName(clean('Maket Clean exterior'));
+  const keep = /^(Восточный_корпус|Западный_корпус|Задний_корпус|Северный_переход|Эстакада)/;
+  for (const o of ext ? ext.children : []) if (o.name && !keep.test(o.name)) campusHide.push(o);
   setLayer('overview'); reveal = 0;
   applyCalib();
   $('#btnAr').disabled = $('#btn3d').disabled = false;
@@ -779,4 +763,4 @@ main();
 
 // for debugging from the console / tests
 window.__ar = { get pose() { return pose; }, get dets() { return lastDets; }, get fps() { return fps; }, S, setLayer,
-  get layer() { return layer; }, get player() { return player; }, get campus() { return campus; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };
+  get layer() { return layer; }, get player() { return player; }, get campus() { return campus; }, get build() { return build; }, inspectAt, get inspector() { return inspector; }, viewCam, get controls() { return controls; }, skip() { phase = 99; reveal = layer === 'overview' ? 0 : 1; }, eq, stages, renderer, focalProc: () => focalProc(), fovOf: f => fovOf(f) };

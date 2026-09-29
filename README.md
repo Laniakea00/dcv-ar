@@ -14,3 +14,6 @@ This repo is only the published copy. The source (tracker, tests, tools, the Uni
 
 - **v2** (2026-09-29): new scene COD_AR_Hologram with all layers, server inspector, auto-play stories for every layer,
   «Кампус 500 МВт» laid out by the site master plan (генплан): 10 modules, «Станция понижения», water works, ЛОС, КПП.
+- **v3** (2026-09-29): «Кампус» laid out as the new physical maket of the campus (10 modules + 2 half modules, water
+  works, ЛОС, energy centre with its stacks); «4D · строительство»: ЦОД-1 built in a see-through shell month by month,
+  then the other modules.
