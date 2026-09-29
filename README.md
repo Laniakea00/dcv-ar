@@ -9,3 +9,8 @@ the COD_AR_Hologram scene of the Unity app stands on it as a hologram, with the 
 This repo is only the published copy. The source (tracker, tests, tools, the Unity export menu) lives in the private
 `qtwin-io/cod-ar-viewer`, folder `web/`. three.js r179 (MIT) in `vendor/three/`. `model/dcv_web.glb` is the previous
 (DCV v5) model and is no longer loaded.
+
+## Versions
+
+- **v2** (2026-09-29): new scene COD_AR_Hologram with all layers, server inspector, auto-play stories for every layer,
+  «Кампус 500 МВт» laid out by the site master plan (генплан): 10 modules, «Станция понижения», water works, ЛОС, КПП.
