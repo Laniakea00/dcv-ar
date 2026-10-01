@@ -5,6 +5,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#000000">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Долина ЦОД · сценарии</title>
 <style>
   :root { --gold: #c9a063; --gold2: #f0d29a; --fsm: clamp(12px, .95vw, 26px); }
@@ -1241,7 +1245,7 @@ function __boot() {
     return;
   }
   $("menu").remove();
-  document.title = B.titles[s]; $("sc-style").textContent = B.styles[s];
+  document.title = B.titles[s].replace("Долина ЦОД · ", "") + " · Долина ЦОД · qTwin"; $("sc-style").textContent = B.styles[s];
   document.body.insertBefore($("tpl-" + s).content.cloneNode(true), document.body.firstChild);
   // the switcher: above «powered by», hidden with the scenario's own interface (H, ?ui=0)
   const sw = document.createElement("div"); sw.id = "switcher";

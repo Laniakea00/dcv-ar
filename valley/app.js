@@ -12,15 +12,33 @@ const SCENARIOS = [
   { k: "inside_min", n: 3, title: "Внутри ЦОД №1", text: "Машинный зал со стойками NVIDIA GB300 NVL72, вычислительный лоток разбирается и собирается", meta: "≈ 80 с · пробел — пауза", pic: "img/preview_inside_min.jpg" },
 ];
 const mobile = matchMedia("(max-width: 860px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
+const narrow = () => matchMedia("(max-width: 760px)").matches;
+const pad2 = n => String(n).padStart(2, "0");
+const ARROW = `<svg viewBox="0 0 16 16"><path d="M4 12L12 4M12 4H4M12 4V12"/></svg>`;
 
-// ---------------------------------------------------------------- scenario cards and dock
+// ---------------------------------------------------------------- scenarios: tabs + card on the welcome, segmented bar in 3D
 const openScenario = k => { $("wait").hidden = false; setTimeout(() => { location.href = "scenarios.html?s=" + encodeURIComponent(k); }, 40); };
-$("cards").innerHTML = SCENARIOS.map(s => `<button class="card-s" data-k="${s.k}"><div class="pic" style="background-image:url(${s.pic})"></div>
-  <div class="txt"><div class="row"><span class="num">${s.n}</span><h2>${s.title}</h2></div><p>${s.text}</p><div class="meta">${s.meta}</div></div></button>`).join("");
-$("dockBtns").innerHTML = SCENARIOS.map(s => `<button class="dock-btn" data-k="${s.k}" title="${s.text}"><span class="th" style="background-image:url(${s.pic})"></span>
-  <span><b>${s.title}</b><small>${s.meta}</small></span></button>`).join("");
-document.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => openScenario(b.dataset.k)));
+let scenIdx = 0;
+$("tabs").innerHTML = SCENARIOS.map((s, i) => `<button class="tab${i ? "" : " on"}" data-i="${i}"><small>/SC_00${s.n}</small><span>${s.title}</span></button>`).join("");
+function showScen(i) {
+  scenIdx = i; const s = SCENARIOS[i];
+  document.querySelectorAll(".tab").forEach((t, k) => t.classList.toggle("on", k === i));
+  $("sLabel").textContent = `/SC_00${s.n}`; $("sTitle").textContent = s.title; $("sText").textContent = s.text; $("sMeta").textContent = s.meta;
+  $("sPic").style.backgroundImage = `url(${s.pic})`;
+}
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => showScen(+t.dataset.i));
+$("sGo").onclick = () => openScenario(SCENARIOS[scenIdx].k);
+showScen(0);
+$("dockBtns").innerHTML = SCENARIOS.map(s => `<button class="dbtn" data-k="${s.k}" title="${s.text}"><small>/SC_00${s.n}</small><span>${s.title}${ARROW}</span></button>`).join("");
+document.querySelectorAll(".dbtn").forEach(b => b.onclick = () => openScenario(b.dataset.k));
 addEventListener("pageshow", e => { if (e.persisted) $("wait").hidden = true; });
+const toScenarios = () => $("scenarios").scrollIntoView({ behavior: "smooth" });
+$("toScen").onclick = toScenarios; $("scrollHint").onclick = toScenarios;
+document.querySelectorAll(".qbar .nav button").forEach(b => b.onclick = () => {
+  const go = b.dataset.go;
+  if (go === "view") { if (!$("enter").disabled) enter(); }
+  else { if (!$("view").hidden) showWelcome(); setTimeout(() => go === "scenarios" ? toScenarios() : $("welcome").scrollTo({ top: 0, behavior: "smooth" }), 60); }
+});
 
 // ---------------------------------------------------------------- renderer, scene, camera
 const canvas = $("gl");
@@ -76,8 +94,8 @@ controls.addEventListener("start", () => { flight = null; userTouched(); });
 let STOPS = [], OX = 0, OY = 0, model = null, selected = -1;
 const W3 = (x, y, h = 0) => new THREE.Vector3(x - OX, h, -(y - OY));   // maket metres (X east, Y north) → scene
 const hl = new THREE.Group(); scene.add(hl);
-const hlMat = new THREE.LineBasicMaterial({ color: 0xffd98a, transparent: true, opacity: 1, depthTest: false });
-const fillMat = new THREE.MeshBasicMaterial({ color: 0xffc86a, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+const hlMat = new THREE.LineBasicMaterial({ color: 0xff3939, transparent: true, opacity: 1, depthTest: false });
+const fillMat = new THREE.MeshBasicMaterial({ color: 0xda0a1a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
 
 async function loadStops() {
   const d = await (await fetch("stops.json")).json();
@@ -104,9 +122,12 @@ function measureStops() {
   }
 }
 function buildUI() {
-  $("objList").innerHTML = STOPS.map((s, i) => `<li data-i="${i}"><span class="num">${s.num}</span><span>${s.legend}</span></li>`).join("");
-  $("objList").querySelectorAll("li").forEach(li => li.onclick = () => { select(+li.dataset.i); if (mobile) $("objects").classList.remove("open"); });
-  $("pins").innerHTML = STOPS.map((s, i) => `<div class="pin" data-i="${i}"><span class="tip">${s.short || s.legend}</span><span class="num">${s.num}</span></div>`).join("");
+  $("objList").innerHTML = STOPS.map((s, i) => `<li data-i="${i}"><span class="n">/${pad2(s.num)}</span><span>${s.legend}</span></li>`).join("");
+  $("objList").querySelectorAll("li").forEach(li => li.onclick = () => { select(+li.dataset.i); if (narrow()) $("objects").classList.remove("open"); });
+  $("pins").innerHTML = STOPS.map((s, i) => `<div class="pin" data-i="${i}"><span class="tip">${s.short || s.legend}</span><span class="n">${s.num}</span></div>`).join("");
+  $("chips").innerHTML = [[0, "ЦОД «Казахтелеком»", "50 МВт"], [1, "ЦОД «Firebird»", "136 МВт"], [3, "Подстанция", "500/35 кВ"], [8, "ГРЭС-1", ""], [9, "Водопровод", ""], [10, "Очистные", ""]]
+    .map(([i, t, v]) => `<button class="chip" data-i="${i}">${t}${v ? `<b>${v}</b>` : ""}</button>`).join("");
+  document.querySelectorAll(".chip").forEach(c => c.onclick = () => { enter(); setTimeout(() => select(+c.dataset.i), 500); });
   $("pins").querySelectorAll(".pin").forEach(p => p.onclick = () => select(+p.dataset.i));
 }
 function highlight(s) {
@@ -127,7 +148,7 @@ function select(i) {
   document.querySelectorAll("#objList li").forEach((li, k) => li.classList.toggle("on", k === i));
   document.querySelectorAll(".pin").forEach((p, k) => p.classList.toggle("on", k === i));
   $("objList").children[i]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  $("cNum").textContent = s.num; $("cKind").textContent = s.kind || ""; $("cTitle").textContent = s.title || s.legend;
+  $("cLabel").textContent = "/" + pad2(s.num); $("cPos").textContent = `${i + 1} / ${STOPS.length}`; $("cKind").textContent = s.kind || ""; $("cTitle").textContent = s.title || s.legend;
   $("cVal").textContent = s.value || ""; $("cSub").textContent = s.sub || "";
   if (s.logo) $("cLogo").src = `img/logo_${s.logo}.png`; else $("cLogo").removeAttribute("src");
   $("card").hidden = false;
@@ -167,7 +188,11 @@ addEventListener("keydown", e => {
 });
 
 // ---------------------------------------------------------------- welcome ↔ 3D
+let offTarget = 0;
+function setNav(go) { document.querySelectorAll(".qbar .nav button").forEach(b => b.classList.toggle("on", b.dataset.go === go)); }
 function enter() {
+  if ($("enter").disabled) return;
+  document.body.classList.replace("at-welcome", "at-view"); setNav("view"); offTarget = 0;
   $("welcome").classList.add("out");
   setTimeout(() => { $("welcome").hidden = true; }, 700);
   $("view").hidden = false; controls.enabled = true; controls.autoRotate = true; $("spin").classList.add("on");
@@ -176,15 +201,16 @@ function enter() {
   clearTimeout(hintTimer); $("hint").classList.remove("out"); hintTimer = setTimeout(userTouched, 7000);
 }
 function showWelcome() {
+  document.body.classList.replace("at-view", "at-welcome"); setNav("welcome"); offTarget = 1; $("objects").classList.remove("open");
   deselect(); $("view").hidden = true; controls.enabled = false; controls.autoRotate = true;
   $("welcome").hidden = false; requestAnimationFrame(() => $("welcome").classList.remove("out"));
   const h = homeView(); flyTo(h.pos.clone().multiplyScalar(1.6), h.target, 1200);
   history.replaceState(null, "", location.pathname);
 }
-$("enter").onclick = enter;
+$("enter").onclick = enter; $("headCta").onclick = enter; $("headCta").disabled = true;
 
 // ---------------------------------------------------------------- loading
-const setProgress = f => { $("loadBar").style.width = (f * 100).toFixed(0) + "%"; $("loadText").textContent = `Загрузка макета… ${(f * 100).toFixed(0)} %`; };
+const setProgress = f => { $("loadBar").style.width = (f * 100).toFixed(0) + "%"; $("loadPct").textContent = `${(f * 100).toFixed(0)} %`; };
 Promise.all([
   loadStops(),
   new Promise((res, rej) => new GLTFLoader().load(MODEL, res, x => setProgress(Math.min(0.99, x.loaded / (x.lengthComputable && x.total ? x.total : MODEL_BYTES))), rej)),
@@ -197,10 +223,11 @@ Promise.all([
   });
   scene.add(model);
   measureStops(); buildUI();
-  $("enter").disabled = false; $("enter").classList.add("ready"); $("loadText").textContent = "Вращайте, приближайте, выбирайте объекты";
+  $("enter").disabled = false; $("enter").classList.add("ready"); $("headCta").disabled = false;
+  $("enterLabel").innerHTML = `Смотреть в 3D`; $("enter").insertAdjacentHTML("beforeend", ARROW);
   if (new URLSearchParams(location.search).get("view") === "3d") enter();
 }).catch(err => {
-  console.error(err); $("loadText").textContent = "Не удалось загрузить модель — обновите страницу";
+  console.error(err); $("enterLabel").textContent = "Не удалось загрузить — обновите страницу"; $("loadPct").textContent = "";
 });
 
 // ---------------------------------------------------------------- frame loop
@@ -221,8 +248,16 @@ function resize() {
   camera.fov = camera.aspect < 0.85 ? 50 : 38; camera.updateProjectionMatrix();
 }
 addEventListener("resize", resize);
+let off = 1; offTarget = new URLSearchParams(location.search).get("view") === "3d" ? 0 : 1;
+function applyOffset() {
+  const w = innerWidth, h = innerHeight, bar = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--bar")) || 80;
+  const wide = w / h > 1.1;
+  const ox = (wide ? -0.17 * w : 0) * off, oy = (wide ? -0.02 * h : -0.12 * h) * off - (bar / 2) * (1 - off);
+  if (Math.abs(ox) + Math.abs(oy) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(w, h, ox, oy, w, h);
+}
 renderer.setAnimationLoop(now => {
   stepFlight(now);
+  off += (offTarget - off) * 0.06; applyOffset();
   if (!$("view").hidden || !controls.enabled) { if (!flight) controls.update(); else controls.update(); }
   const pulse = 0.5 + 0.5 * Math.sin(now / 300); hlMat.opacity = 0.6 + 0.4 * pulse; fillMat.opacity = 0.1 + 0.14 * pulse;
   renderer.render(scene, camera);
