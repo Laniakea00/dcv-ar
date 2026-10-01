@@ -42,7 +42,7 @@ body * { font-family: inherit; }
 /* object card */
 #card .num { border-radius: 0 !important; background: transparent !important; color: var(--q-red2) !important; box-shadow: none !important; font-weight: 400 !important;
   min-width: 0 !important; height: auto !important; padding: 0 !important; font-size: calc(var(--fs) * 1) !important; }
-#card .num { white-space: nowrap; } #card .num::before { content: "/"; }
+#card .num { white-space: nowrap; display: inline-block !important; } #card .num::before { content: "/"; }
 #card .kind { color: var(--q-steel) !important; letter-spacing: .04em !important; font-size: calc(var(--fs) * .8) !important; }
 #card h2 { font-weight: 400 !important; }
 #card .val { font-weight: 300 !important; letter-spacing: -.02em !important; }
@@ -128,3 +128,69 @@ body.min #axis .gtrack, #track { border-radius: 0 !important; background: #0f0f0
 #switcher button.menu { color: var(--q-steel) !important; border-bottom: 0 !important; text-transform: uppercase; font-size: .85em !important; }
 #switcher button.menu:hover { background: #fff !important; color: #0c0c0c !important; }
 #wait { background: #000 !important; color: var(--q-steel) !important; text-transform: uppercase; font-family: "Geologica", system-ui, sans-serif !important; font-size: 14px !important; letter-spacing: .04em; }
+
+/* ================================================================ phones (portrait) and small landscape screens */
+@media (max-width: 760px), (max-height: 500px) {
+  :root { --fs: 12px; }
+  /* top: logo cell + the scenario switcher as one strip */
+  #brand { height: 44px !important; padding: 0 10px !important; gap: 0 !important; z-index: 6 !important; }
+  #brand img { height: 22px !important; }
+  #brand > span { display: none !important; }
+  #switcher { top: 0 !important; bottom: auto !important; left: 76px !important; right: 0 !important; width: auto !important; height: 44px; visibility: visible !important;
+    flex-direction: row !important; overflow-x: auto; scrollbar-width: none; border-top: 0 !important; border-right: 0 !important; z-index: 6 !important; }
+  #switcher::-webkit-scrollbar { display: none; }
+  #switcher .lab { display: none !important; }
+  #switcher button { flex: 0 0 auto; padding: 0 12px !important; font-size: 12px !important; border-bottom: 0 !important; border-right: 1px solid var(--q-line2) !important; height: 100%; }
+  #switcher button.on::before { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: 2px; }
+  #switcher button.menu { order: -1; border-right: 1px solid var(--q-line) !important; }
+  #powered { display: none !important; }
+  #status { display: none !important; }
+
+  /* tour: card under the strip, the numbers bar at the bottom (scrolls sideways) */
+  #card { left: 8px !important; right: 8px !important; top: auto !important; bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important; width: auto !important; max-height: 38vh !important;
+    padding: 12px 14px !important; transform: none; }
+  #card.hide { transform: translateY(10px) !important; }
+  #card .kind { margin-top: 4px !important; }
+  #card h2 { font-size: 16px !important; margin-top: 2px !important; }
+  #card .logo { max-height: 20px !important; margin-top: 6px !important; }
+  #card .val { font-size: 34px !important; margin-top: 6px !important; }
+  #card .sub { font-size: 13px !important; margin-top: 2px !important; }
+  #card svg { max-height: 18vh !important; margin-top: 6px !important; }
+  #nav { left: 8px !important; right: 8px !important; bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important; transform: none !important; overflow-x: auto; scrollbar-width: none; justify-content: flex-start !important; }
+  #nav::-webkit-scrollbar { display: none; }
+  #nav .btn { flex: 0 0 auto; height: 44px; min-width: 44px; font-size: 13px !important; padding: 0 12px !important; }
+  #chain, #flowKey { display: none !important; }
+  .pin { font-size: 11px !important; }
+  .pin .n { min-width: 22px !important; height: 22px !important; }
+  .pin::after { height: 8px !important; }
+  .pin .t { display: none !important; }
+  .pin.big .t, .pin.named.big .t { display: block !important; }
+
+  /* 4D / inside: chapter title under the strip, counter beside it, timeline at the bottom */
+  #chapter { top: 52px !important; left: 8px !important; right: 8px !important; transform: none !important; min-width: 0 !important; max-width: none !important; padding: 8px 12px !important; border-top: 1px solid var(--q-line) !important; }
+  #chapter .num { min-width: 22px !important; height: 22px !important; font-size: 12px !important; }
+  #chTitle { font-size: 15px !important; }
+  #chFacts { font-size: 12px !important; margin-top: 2px !important; }
+  #phases { margin-top: 6px !important; }
+  #phases span { font-size: 11px !important; padding: 2px 8px !important; }
+  #counter { top: auto !important; bottom: calc(118px + env(safe-area-inset-bottom, 0px)) !important; right: 8px !important; min-width: 0 !important; padding: 6px 10px !important; border: 1px solid var(--q-line) !important; }
+  #counter .k { font-size: 9px !important; }
+  #counter .v { font-size: 26px !important; }
+  #timeline { left: 0 !important; right: 0 !important; bottom: 0 !important; width: auto !important; padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px)) !important; border-left: 0 !important; }
+  #timeline .ctl { gap: 6px !important; }
+  #timeline .btn { height: 40px; min-width: 44px; font-size: 13px !important; padding: 0 12px !important; display: inline-flex; align-items: center; justify-content: center; }
+  #timeline .note { display: none !important; }
+  #clock { font-size: 12px !important; margin-left: 4px !important; overflow: hidden; text-overflow: ellipsis; }
+  #gantt { margin-top: 8px !important; }
+  #axis .gtrack { height: 30px !important; }
+  /* chapter labels on the track: only the current one is written, the rest are ticks */
+  .gch { font-size: 0 !important; padding: 0 !important; }
+  .gch.on { font-size: 11px !important; padding: 0 0 4px 6px !important; z-index: 1; background: linear-gradient(90deg, #0f0f0f 70%, transparent); }
+  .gms { font-size: 0 !important; } .gms::after { font-size: 9px !important; }
+  #track { height: 30px !important; margin-top: 8px !important; }
+  .seg { font-size: 0 !important; padding: 0 !important; }
+  .seg.on { font-size: 11px !important; padding: 0 6px !important; z-index: 1; overflow: visible; }
+  #cap { bottom: calc(120px + env(safe-area-inset-bottom, 0px)) !important; max-width: 92vw !important; font-size: 14px !important; }
+  .lab { font-size: 11px !important; }
+  #load .bar { width: 60vw !important; }
+}

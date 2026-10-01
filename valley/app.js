@@ -82,7 +82,45 @@ function stepFlight(now) {
   camera.position.lerpVectors(flight.p0, flight.p1, e); controls.target.lerpVectors(flight.t0, flight.t1, e);
   if (k >= 1) flight = null;
 }
-controls.addEventListener("start", () => { flight = null; userTouched(); });
+// touch: one finger turns, two fingers zoom and move; the auto-spin stops as soon as the person takes over
+controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+if (mobile) Object.assign(controls, { rotateSpeed: 0.75, zoomSpeed: 1.1, panSpeed: 0.9 });
+controls.addEventListener("start", () => { flight = null; userTouched(); if (controls.autoRotate) { controls.autoRotate = false; $("spin").classList.remove("on"); } });
+document.addEventListener("gesturestart", e => e.preventDefault());   // iOS: no page zoom on pinch
+
+// tap / click on a building opens it (a press that did not move = a tap)
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), hitBox = new THREE.Box3(), hitPt = new THREE.Vector3();
+let press = null;
+canvas.addEventListener("pointerdown", e => { press = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, n: (press && press.n || 0) + 1 }; });
+canvas.addEventListener("pointerup", e => {
+  if (!press || e.pointerId !== press.id || $("view").hidden) { press = null; return; }
+  const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y), quick = performance.now() - press.t < 450; press = null;
+  if (moved > 8 || !quick || !STOPS.length) return;
+  const i = pickStop(e.clientX, e.clientY);
+  if (i >= 0) select(i);
+});
+function pickStop(x, y) {
+  ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  let best = -1, bestD = Infinity, bestA = Infinity;
+  STOPS.forEach((s, i) => {
+    for (const r of s.rects || []) {
+      hitBox.min.set(r.x0 - 0.004, 0, r.z0 - 0.004); hitBox.max.set(r.x1 + 0.004, r.top + 0.004, r.z1 + 0.004);
+      if (!ray.ray.intersectBox(hitBox, hitPt)) continue;
+      const d = hitPt.distanceTo(ray.ray.origin), area = (r.x1 - r.x0) * (r.z1 - r.z0);
+      // nearest box wins; among overlapping ones (a small building inside a big plot) the smaller one
+      if (d < bestD - 0.01 || (Math.abs(d - bestD) <= 0.01 && area < bestA)) { best = i; bestD = d; bestA = area; }
+    }
+  });
+  return best;
+}
+// the cursor shows a hand over a building (desktop)
+let hoverT = 0;
+canvas.addEventListener("pointermove", e => {
+  if (e.pointerType !== "mouse" || $("view").hidden || e.buttons) return;
+  const now = performance.now(); if (now - hoverT < 60) return; hoverT = now;
+  canvas.style.cursor = pickStop(e.clientX, e.clientY) >= 0 ? "pointer" : "";
+});
 
 // ---------------------------------------------------------------- the maket's objects (экспликация 1–11)
 let STOPS = [], OX = 0, OY = 0, model = null, selected = -1;
@@ -241,7 +279,7 @@ let lift = 0;   // phone, 3D view, an object open: the maket moves up out from u
 function applyOffset() {
   const w = innerWidth, h = innerHeight, wide = w / h > 1.1;
   lift += ((narrow() && selected >= 0 && offTarget === 0 ? 0.24 : 0) - lift) * 0.08;
-  const ox = (wide ? -0.13 * w : 0) * off, oy = (wide ? 0.06 * h : 0.2 * h) * off + lift * h;
+  const ox = (wide ? -0.16 * w : 0) * off, oy = (wide ? 0.06 * h : 0.2 * h) * off + lift * h;
   if (Math.abs(ox) + Math.abs(oy) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(w, h, ox, oy, w, h);
 }
 function resize() {
