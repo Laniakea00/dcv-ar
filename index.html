@@ -2,81 +2,17 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#0b1016">
-<title>Долина ЦОД · 50 МВт — AR</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect x=%222%22 y=%224%22 width=%2212%22 height=%228%22 rx=%221%22 fill=%22%2336c2a8%22/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css">
-<script type="importmap">
-{ "imports": {
-  "three": "./vendor/three/build/three.module.min.js",
-  "three/addons/": "./vendor/three/examples/jsm/"
-} }
-</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>Data Center Valley · qTwin</title>
+<link rel="icon" type="image/svg+xml" href="valley/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="valley/favicon-32.png">
+<link rel="apple-touch-icon" href="valley/apple-touch-icon.png">
+<link rel="canonical" href="valley/">
+<meta http-equiv="refresh" content="0; url=valley/">
+<script>location.replace("valley/" + location.search + location.hash);</script>
+<style>html,body{margin:0;height:100%;background:#000;color:#878787;font:14px system-ui,sans-serif}a{color:#fdfcfc}body{display:grid;place-items:center}</style>
 </head>
-<body>
-<video id="cam" playsinline muted autoplay></video>
-<canvas id="gl"></canvas>
-<canvas id="dbg"></canvas>
-<div id="labels"></div>
-
-<div id="start" class="panel start">
-  <div class="brand">QazTWIN · ЦОД</div>
-  <h1>Долина ЦОД<br>50 МВт</h1>
-  <p>Наведите камеру на AR-коврик: голограмма площадки встанет на него. Серверы, энергия, охлаждение, сеть и защита — по слоям.</p>
-  <button id="btnAr" class="primary">Запустить AR</button>
-  <button id="btn3d" class="ghost">Смотреть в 3D без камеры</button>
-  <div id="loadBar"><div id="loadFill"></div></div>
-  <div id="loadText" class="muted">Загрузка модели…</div>
-  <div id="startErr" class="err"></div>
-</div>
-
-<div id="hud" hidden>
-  <div id="status" class="pill">Ищу коврик…</div>
-  <div id="summary" class="card">
-    <div id="sumTitle" class="muted small">Долина ЦОД</div>
-    <div id="sumValue">50 МВт</div>
-    <div id="sumNote" class="muted small">Проектная очередь · выберите систему</div>
-  </div>
-  <div id="inspect" class="card" hidden>
-    <div class="row"><b id="insTitle"></b><span class="row"><button id="insLevel" class="ghost small">Раскрыть</button><button id="insClose" class="ghost small" aria-label="Закрыть">✕</button></span></div>
-    <div id="insMetric"></div>
-    <div id="insBody"></div>
-    <div id="insNote" class="muted small"></div>
-  </div>
-  <div id="story" class="card" hidden>
-    <div class="row"><span id="stName" class="muted small"></span>
-      <span class="row ctl"><span id="stCount" class="muted small"></span><button id="stPrev" class="ghost small" aria-label="Назад">◀</button><button id="stPlay" class="ghost small" aria-label="Пауза">❚❚</button><button id="stNext" class="ghost small" aria-label="Дальше">▶</button><button id="stClose" class="ghost small" aria-label="Закрыть">✕</button></span></div>
-    <div id="stBar"></div>
-    <div id="stTitle"></div>
-    <div id="stText"></div>
-    <div id="stResult"></div>
-  </div>
-  <div id="chips"></div>
-  <div id="bar">
-    <div id="modes"></div>
-    <button id="tour" title="Показ">▶ Показ</button>
-    <button data-t="settings" title="Калибровка">⚙</button>
-  </div>
-</div>
-
-<div id="settings" class="panel sheet" hidden>
-  <div class="row head"><b>Настройки</b><button id="close" class="ghost small">Готово</button></div>
-  <p class="muted">Сдвиг и поворот голограммы на коврике, размер. Сохраняется на этом телефоне.</p>
-  <label>Сдвиг X, мм <output></output><input type="range" data-k="dx" min="-40" max="40" step="0.5"></label>
-  <label>Сдвиг Z, мм <output></output><input type="range" data-k="dz" min="-40" max="40" step="0.5"></label>
-  <label>Высота, мм <output></output><input type="range" data-k="dy" min="-10" max="30" step="0.5"></label>
-  <label>Поворот, ° <output></output><input type="range" data-k="rot" min="-180" max="180" step="1"></label>
-  <label>Размер, % <output></output><input type="range" data-k="scale" min="50" max="150" step="1"></label>
-  <label>Высота подъёма слоёв, % <output></output><input type="range" data-k="lift" min="0" max="140" step="5"></label>
-  <label>Угол обзора камеры, ° <output></output><input type="range" data-k="fov" min="0" max="85" step="0.5"></label>
-  <p class="muted small">0 = авто (оценивается по коврику) · сейчас: <span id="fovNow">—</span></p>
-  <label class="check"><input type="checkbox" data-k="shadows"> Тени (медленнее на старых телефонах)</label>
-  <label class="check"><input type="checkbox" data-k="showBoard"> Показать контур коврика</label>
-  <label class="check"><input type="checkbox" data-k="debug"> Отладка: найденные метки</label>
-  <div class="row"><button id="reset" class="ghost small">Сбросить</button><span id="stats" class="muted small"></span></div>
-</div>
-
-<script type="module" src="app.js"></script>
-</body>
+<body><noscript><a href="valley/">Data Center Valley</a></noscript></body>
 </html>

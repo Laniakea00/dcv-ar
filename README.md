@@ -1,28 +1,24 @@
-# Долина ЦОД · 50 МВт — web AR
+# Data Center Valley · qTwin
 
-**Open: https://laniakea00.github.io/dcv-ar/**
+Сайт: **https://laniakea00.github.io/dcv-ar/** (корень сразу открывает `valley/`).
 
-A static page: the phone camera finds the printed AR mat (`print/board_A4.pdf` or `board_A3.pdf`, print at 100 %) and
-the COD_AR_Hologram scene of the Unity app stands on it as a hologram, with the layers of the app (Макет, Серверы,
-Энергия, Охлаждение, Сеть, Защита, Все системы), tap-to-inspect and a tour. Without the mat it is a plain 3D viewer.
+Статический сайт: сборки, сервера и базы нет. three.js r179 (MIT) лежит в `vendor/three/`.
 
-This repo is only the published copy. The source (tracker, tests, tools, the Unity export menu) lives in the private
-`qtwin-io/cod-ar-viewer`, folder `web/`. three.js r179 (MIT) in `vendor/three/`. `model/dcv_web.glb` is the previous
-(DCV v5) model and is no longer loaded.
+## `valley/` — 3D-двойник и сценарии
 
-## Versions
+- Приветствие → «Открыть живой 3D-двойник» (`valley/DolinaCOD_GRES2.glb`): вращение, приближение, слои
+  «Энергосети», «Статус», «Ночь», «Номера»; нажатие на здание открывает его, повторное нажатие возвращает назад.
+- Сценарии «Экспликация», «4D-строительство», «Внутри ЦОД №1»: `valley/scenarios.html?s=tour_min | 4d_min | inside_min`.
+  Крупные данные сценариев лежат отдельными файлами в `valley/parts/` и подгружаются при открытии.
 
-- **v2** (2026-09-29): new scene COD_AR_Hologram with all layers, server inspector, auto-play stories for every layer,
-  «Кампус 500 МВт» laid out by the site master plan (генплан): 10 modules, «Станция понижения», water works, ЛОС, КПП.
-- **v3** (2026-09-29): «Кампус» laid out as the new physical maket of the campus (10 modules + 2 half modules, water
-  works, ЛОС, energy centre with its stacks); «4D · строительство»: ЦОД-1 built in a see-through shell month by month,
-  then the other modules.
+## Перенос на свой хост
 
-## Долина ЦОД · 3D-макет и сценарии — `valley/`
+Выложить содержимое репозитория (без `.git`) целиком, структуру папок не менять (`valley/` берёт `../vendor/`).
+Нужен HTTPS, открывать только через http(s). MIME: `.js` text/javascript, `.json` application/json,
+`.glb` model/gltf-binary, `.b64` text/plain. Включить gzip/brotli для `.b64 .json .js .css .html`.
+`.nojekyll` нужен только для GitHub Pages.
 
-**Open: https://laniakea00.github.io/dcv-ar/valley/**
+## AR (в разработке)
 
-Приветствие → «Смотреть Долину ЦОД в 3D» (GLB `valley/DolinaCOD_GRES2.glb`: вращение, приближение, номера объектов 1–11
-с карточками) → кнопки сценариев «Экспликация», «4D-строительство», «Внутри ЦОД №1» (`valley/scenarios.html?s=…`,
-из `DolinaCOD_GRES2_scenarios_min.html`; крупные встроенные данные вынесены в `valley/parts/`, чтобы каждый файл был
-меньше лимитов GitHub). В сценарии кнопка «← 3D-макет» возвращает в 3D-вид.
+Веб-AR пока не публикуется: страница убрана из корня, ни одна страница сайта на неё не ссылается
+(`ar.html`, закрыта от поисковиков). Исходники — в приватном `qtwin-io/cod-ar-viewer`, папка `web/`.
