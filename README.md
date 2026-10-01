@@ -17,3 +17,12 @@ This repo is only the published copy. The source (tracker, tests, tools, the Uni
 - **v3** (2026-09-29): «Кампус» laid out as the new physical maket of the campus (10 modules + 2 half modules, water
   works, ЛОС, energy centre with its stacks); «4D · строительство»: ЦОД-1 built in a see-through shell month by month,
   then the other modules.
+
+## Долина ЦОД · 3D-макет и сценарии — `valley/`
+
+**Open: https://laniakea00.github.io/dcv-ar/valley/**
+
+Приветствие → «Смотреть Долину ЦОД в 3D» (GLB `valley/DolinaCOD_GRES2.glb`: вращение, приближение, номера объектов 1–11
+с карточками) → кнопки сценариев «Экспликация», «4D-строительство», «Внутри ЦОД №1» (`valley/scenarios.html?s=…`,
+из `DolinaCOD_GRES2_scenarios_min.html`; крупные встроенные данные вынесены в `valley/parts/`, чтобы каждый файл был
+меньше лимитов GitHub). В сценарии кнопка «← 3D-макет» возвращает в 3D-вид.

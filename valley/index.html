@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f13">
+<title>Долина ЦОД · Data Center Valley</title>
+<meta name="description" content="Интерактивный 3D-макет Долины ЦОД (Экибастуз) и сценарии презентации.">
+<link rel="icon" href="img/logo_dcv.png">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "../vendor/three/build/three.module.min.js",
+  "three/addons/": "../vendor/three/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="gl"></canvas>
+
+<!-- welcome -->
+<section id="welcome">
+  <header class="top">
+    <img src="img/logo_dcv.png" alt="Data Center Valley">
+    <span class="place">· Экибастуз</span>
+  </header>
+  <div class="hero">
+    <div class="kicker">Интерактивный макет</div>
+    <h1>Долина ЦОД</h1>
+    <p class="lead">Кампус центров обработки данных рядом с Экибастузской ГРЭС-1: ЦОДы «Казахтелеком» и «Firebird»,
+      подстанции 500/35 кВ, водопровод и очистные — на 3D-модели макета.</p>
+    <div class="stats">
+      <div><b>50 МВт</b><span>ЦОД «Казахтелеком» · II кв. 2027</span></div>
+      <div><b>136 МВт</b><span>ЦОД «Firebird» · I кв. 2028</span></div>
+      <div><b>11</b><span>объектов на макете</span></div>
+    </div>
+    <button id="enter" class="cta" disabled>
+      <span class="cta-label">Смотреть Долину ЦОД в 3D</span>
+      <span class="cta-progress"><i id="loadBar"></i></span>
+      <span id="loadText" class="cta-sub">Загрузка макета…</span>
+    </button>
+  </div>
+  <div class="scen">
+    <div class="scen-title">Сценарии презентации</div>
+    <div class="cards" id="cards"></div>
+  </div>
+  <footer class="pw"><span>powered by</span><img src="img/logo_qtwin.png" alt="qTwin"></footer>
+</section>
+
+<!-- 3D view -->
+<section id="view" hidden>
+  <div id="pins"></div>
+  <header class="bar-top">
+    <button id="home" class="glass icon-btn" title="На главную" aria-label="На главную">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+    </button>
+    <div class="brand glass"><img src="img/logo_dcv.png" alt="Data Center Valley"><span>· Экибастуз</span></div>
+    <div class="spacer"></div>
+    <button id="objToggle" class="glass pill-btn">Объекты</button>
+  </header>
+
+  <aside id="objects" class="glass">
+    <h3>Экспликация</h3>
+    <ol id="objList"></ol>
+  </aside>
+
+  <div id="card" class="glass" hidden>
+    <button id="cardClose" class="x" aria-label="Закрыть">×</button>
+    <div class="card-head"><span class="num" id="cNum">1</span><span class="kind" id="cKind"></span></div>
+    <h2 id="cTitle"></h2>
+    <img id="cLogo" alt="">
+    <div class="val" id="cVal"></div>
+    <div class="sub" id="cSub"></div>
+    <div class="nav"><button id="prev">←</button><button id="next">→</button></div>
+  </div>
+
+  <div class="tools glass">
+    <button id="reset" title="Общий вид" aria-label="Общий вид"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
+    <button id="spin" title="Вращение" aria-label="Вращение" class="on"><svg viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 1 8 8M12 20a8 8 0 0 1-8-8M17 9l3 3 3-3M7 15l-3-3-3 3"/></svg></button>
+    <button id="labels" title="Номера объектов" aria-label="Номера объектов" class="on"><svg viewBox="0 0 24 24"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2"/></svg></button>
+    <button id="fs" title="Во весь экран" aria-label="Во весь экран"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+
+  <nav id="dock" class="glass">
+    <span class="dock-lab">Сценарии</span>
+    <div id="dockBtns"></div>
+  </nav>
+
+  <div id="hint" class="glass">Вращайте — мышью или пальцем · колесо / щипок — приближение · правая кнопка / два пальца — сдвиг</div>
+</section>
+
+<div id="wait" hidden><div class="spinner"></div><span>Открываю сценарий…</span></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
