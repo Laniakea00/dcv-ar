@@ -5,7 +5,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const $ = id => document.getElementById(id);
-const MODEL = "DolinaCOD_GRES2.glb", MODEL_BYTES = 14289388;
+const MODEL = "DolinaCOD_GRES2.glb", MODEL_BYTES = 14098716;
 const SCENARIOS = [
   { k: "tour_min", n: 1, title: "Экспликация", text: "Объекты 1 → 11: камера летит к объекту, данные табличек", meta: "по шагам", pic: "img/preview_tour_min.jpg" },
   { k: "4d_min", n: 2, title: "4D-строительство", text: "Площадка, каркас, стены, кровля, краны — по порядку номеров", meta: "≈ 80 с", pic: "img/preview_4d_min.jpg" },
@@ -248,7 +248,7 @@ Promise.all([
     const m = o.material; if (m && m.map) m.map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   });
   scene.add(model);
-  measureStops(); buildUI();
+  measureStops(); buildUI(); buildPlantLife();
   $("enter").disabled = false; $("enter").classList.add("ready"); $("enterLabel").textContent = "Смотреть макет в 3D";
   scan();
   if (offTarget === 0) { offTarget = 1; enter(); }
@@ -290,7 +290,50 @@ addEventListener("resize", resize);
 // the readout follows the camera (azimuth / elevation / distance) in the 3D view; the compass needle points north
 const sph = new THREE.Spherical(), tmp = new THREE.Vector3();
 let lastReadout = 0;
+// ---------------------------------------------------------------- ГРЭС-1 works: smoke from the stacks, aviation lights
+const plant = { puffs: [], lights: [], t: 0 };
+function buildPlantLife() {
+  const ch = model.getObjectByName("chimney"); if (!ch) return;
+  ch.updateWorldMatrix(true, false);
+  const pos = ch.geometry.attributes.position, v = new THREE.Vector3(), pts = [];
+  for (let i = 0; i < pos.count; i += 3) pts.push(v.fromBufferAttribute(pos, i).applyMatrix4(ch.matrixWorld).clone());
+  // two stacks in one mesh: split along the axis they stand on
+  const bb = new THREE.Box3().setFromPoints(pts), ax = bb.max.x - bb.min.x > bb.max.z - bb.min.z ? "x" : "z", mid = (bb.min[ax] + bb.max[ax]) / 2;
+  const tex = (() => {
+    const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d");
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,.9)"); gr.addColorStop(.45, "rgba(235,236,238,.45)"); gr.addColorStop(1, "rgba(220,222,225,0)");
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  for (const side of [0, 1]) {
+    const sp = pts.filter(p => side ? p[ax] >= mid : p[ax] < mid); if (!sp.length) continue;
+    const b = new THREE.Box3().setFromPoints(sp), top = new THREE.Vector3((b.min.x + b.max.x) / 2, b.max.y, (b.min.z + b.max.z) / 2), r = (b.max.x - b.min.x) / 2;
+    const N = mobile ? 16 : 26;
+    for (let k = 0; k < N; k++) {
+      const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0, color: 0xeef0f2 });
+      const s = new THREE.Sprite(m); s.renderOrder = 3; scene.add(s);
+      plant.puffs.push({ s, top, r, life: 9 + Math.random() * 4, age: (k / N) * 11, sway: Math.random() * 6.28 });
+    }
+    // red aviation light on the rim, blinking
+    const l = new THREE.Mesh(new THREE.SphereGeometry(Math.max(r * .18, .0025), 10, 8), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, toneMapped: false }));
+    l.position.copy(top).add(new THREE.Vector3(0, .002, 0)); scene.add(l); plant.lights.push(l);
+  }
+}
+function tickPlant(dt) {
+  plant.t += dt;
+  const wind = new THREE.Vector3(0.010, 0, -0.006);   // m/s on the maket scale
+  for (const p of plant.puffs) {
+    p.age += dt; if (p.age > p.life) p.age -= p.life;
+    const k = p.age / p.life;
+    p.s.position.set(p.top.x, p.top.y + 0.004 + k * 0.10, p.top.z).addScaledVector(wind, p.age).add(new THREE.Vector3(Math.sin(p.sway + p.age * .7) * .004, 0, Math.cos(p.sway + p.age * .5) * .004));
+    const size = p.r * 2.2 + k * 0.07; p.s.scale.set(size, size, 1);
+    p.s.material.opacity = Math.min(1, k * 8) * (1 - k) * 0.55;
+  }
+  const on = (plant.t % 1.6) < 0.25;
+  for (const l of plant.lights) l.material.opacity = on ? 1 : 0.15;
+}
+let lastT = 0;
 renderer.setAnimationLoop(now => {
+  const dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now; tickPlant(dt);
   stepFlight(now);
   off += (offTarget - off) * 0.06; applyOffset();
   controls.update();
