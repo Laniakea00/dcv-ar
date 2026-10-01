@@ -1,0 +1,130 @@
+/* qTwin skin for the presentation scenarios (tour / 4D / inside): black, 1px charcoal lines, square corners, Geologica,
+   frost text, red accent — the same widgets as the 3D page (index.html). Loaded after the scenario's own style. */
+:root {
+  --q-panel: rgba(8, 8, 8, .86); --q-line: #323232; --q-line2: #1d1d1d; --q-frost: #fdfcfc; --q-steel: #878787; --q-silver: #c3c3c3;
+  --q-light: #e8e8e8; --q-btn: #1c1c1c; --q-red: #da0a1a; --q-red2: #ff3939;
+  --gold: #ff3939; --gold2: #fdfcfc; --panel: var(--q-panel); --line: var(--q-line);
+}
+html, body { background: #000 !important; font-family: "Geologica", "Open Sans", system-ui, sans-serif !important; color: var(--q-frost) !important; -webkit-font-smoothing: antialiased; }
+::selection { background: rgba(224, 38, 27, .85); color: var(--q-frost); }
+body * { font-family: inherit; }
+
+/* panels */
+.glass { background: var(--q-panel) !important; border: 1px solid var(--q-line) !important; border-radius: 0 !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+
+/* brand (top left): qTwin-style cell */
+#brand { top: 0 !important; left: 0 !important; height: calc(var(--fs) * 4.4); padding: 0 1.6vw; gap: 1vw !important; background: #000; border: 1px solid var(--q-line); border-top: 0; border-left: 0; }
+#brand img { height: calc(var(--fs) * 2.1) !important; }
+#brand .t { font-weight: 400 !important; letter-spacing: .04em !important; font-size: .92em; }
+#brand .s { color: var(--q-steel) !important; text-transform: uppercase; font-size: .8em; letter-spacing: .04em; }
+
+/* buttons — dark cells, the active one light (as the primary button on qtwin.io), red hairline under it */
+.btn { font: 400 var(--fs) "Geologica", system-ui, sans-serif !important; color: var(--q-silver) !important; background: var(--q-btn) !important;
+  border: 1px solid var(--q-line) !important; border-radius: 0 !important; padding: .7vh .95vw !important; transition: background .2s, color .2s, border-color .2s !important; }
+.btn:hover { background: #2a2a2a !important; color: var(--q-frost) !important; }
+.btn.on, .btn.cy.on { background: var(--q-light) !important; color: #0c0c0c !important; border-color: var(--q-light) !important; box-shadow: inset 0 -2px 0 var(--q-red); }
+.chip { min-width: 2.6em !important; }
+.sep { background: var(--q-line) !important; margin: 0 .4vw !important; }
+#nav { gap: 0 !important; padding: 0 !important; }
+#nav .btn { border-width: 0 1px 0 0 !important; height: calc(var(--fs) * 3.4); padding: 0 1vw !important; }
+#nav .btn:last-child { border-right: 0 !important; }
+#nav .sep { display: none; }
+
+/* exp. list */
+#legend h3 { color: var(--q-frost) !important; font-weight: 400 !important; text-transform: uppercase; font-size: .9em !important; letter-spacing: .04em; padding-bottom: .8vh; border-bottom: 1px solid var(--q-line); }
+#legend h3::before { content: "/"; }
+.li { border-radius: 0 !important; border-left: 2px solid transparent !important; color: var(--q-silver) !important; font-weight: 300; }
+.li:hover { background: #141414 !important; color: var(--q-frost) !important; }
+.li.on { background: #161616 !important; border-left-color: var(--q-red) !important; color: var(--q-frost) !important; }
+.li b { color: var(--q-steel) !important; font-weight: 400 !important; font-size: .85em; }
+.li.on b { color: var(--q-red2) !important; }
+
+/* object card */
+#card .num { border-radius: 0 !important; background: transparent !important; color: var(--q-red2) !important; box-shadow: none !important; font-weight: 400 !important;
+  min-width: 0 !important; height: auto !important; padding: 0 !important; font-size: calc(var(--fs) * 1) !important; }
+#card .num { white-space: nowrap; } #card .num::before { content: "/"; }
+#card .kind { color: var(--q-steel) !important; letter-spacing: .04em !important; font-size: calc(var(--fs) * .8) !important; }
+#card h2 { font-weight: 400 !important; }
+#card .val { font-weight: 300 !important; letter-spacing: -.02em !important; }
+#card .val small { color: var(--q-steel) !important; font-weight: 300 !important; }
+#card .sub { color: var(--q-silver) !important; font-weight: 300 !important; }
+#card .plate { border-radius: 0 !important; background: #0f0f0f !important; border: 1px solid var(--q-line) !important; color: var(--q-silver) !important; }
+#card svg .b { fill: rgba(255, 255, 255, .05); stroke: rgba(255, 255, 255, .28); }
+#card svg .b.p { fill: rgba(218, 10, 26, .18); stroke: var(--q-red); }
+#card svg .b.p.on, #card svg .b.p:hover { fill: rgba(255, 57, 57, .75); }
+#card svg text { font-family: "Geologica", system-ui, sans-serif; font-weight: 400; }
+#card svg text.h { fill: #fff; }
+
+/* flows & chain */
+#chain .c { border-radius: 0 !important; border: 1px solid var(--q-line) !important; color: var(--q-steel) !important; }
+#chain .c.done { color: var(--q-frost) !important; border-color: #5a5a5a !important; }
+#chain .c.on { color: #0c0c0c !important; background: var(--q-light) !important; border-color: var(--q-light) !important; box-shadow: inset 0 -2px 0 var(--q-red) !important; font-weight: 400 !important; }
+#flowKey { color: var(--q-silver) !important; } #flowKey .n { color: var(--q-steel) !important; } #flowKey i { border-radius: 0 !important; }
+
+/* pins over the maket: square plates */
+.pin .n { border-radius: 0 !important; background: #0c0c0c !important; color: var(--q-frost) !important; border: 1px solid #5a5a5a; font-weight: 400 !important; box-shadow: 0 2px 10px rgba(0, 0, 0, .55) !important; }
+.pin .t { border-radius: 0 !important; background: rgba(8, 8, 8, .92) !important; border: 1px solid var(--q-line) !important; font-weight: 400 !important; }
+.pin.mw .n { background: #1c1c1c !important; border-color: var(--q-line) !important; color: var(--q-silver) !important; }
+.pin.big .n { background: var(--q-red) !important; border-color: var(--q-red2) !important; box-shadow: 0 0 0 1px rgba(255, 57, 57, .5), 0 0 22px rgba(218, 10, 26, .55) !important; }
+.pin::after { width: 1px !important; }
+
+/* powered by: a black cell like the rest */
+#powered { border-radius: 0 !important; background: #000 !important; border: 1px solid var(--q-line); box-shadow: none !important; padding: .9vh 1vw !important; gap: .8vw !important; }
+#powered span { color: var(--q-steel) !important; font-weight: 400 !important; }
+#powered img { height: 3.6vh !important; }
+#status { color: var(--q-steel) !important; }
+
+/* 4D: chapter, counter, timeline */
+#chapter { top: 0 !important; border-top: 0 !important; }
+#chapter .num { border-radius: 0 !important; background: var(--q-red) !important; color: #fff !important; box-shadow: none !important; font-weight: 400 !important; }
+#chTitle { font-weight: 400 !important; }
+#chFacts { color: var(--q-silver) !important; font-weight: 300 !important; }
+#chExtra { color: var(--q-steel) !important; }
+#phases span { border-radius: 0 !important; border-color: var(--q-line) !important; color: var(--q-steel) !important; }
+#phases span.done { color: var(--q-silver) !important; border-color: #5a5a5a !important; }
+#phases span.on { color: #0c0c0c !important; background: var(--q-light) !important; border-color: var(--q-light) !important; box-shadow: inset 0 -2px 0 var(--q-red) !important; font-weight: 400 !important; }
+#counter { top: 0 !important; right: 0 !important; border-top: 0 !important; border-right: 0 !important; }
+#counter .k { color: var(--q-steel) !important; text-transform: uppercase; font-size: calc(var(--fs) * .72) !important; }
+#counter .v { font-weight: 300 !important; letter-spacing: -.02em; }
+#counter .v small { color: var(--q-steel) !important; font-weight: 300 !important; }
+#timeline { right: 0 !important; bottom: 0 !important; border-right: 0 !important; border-bottom: 0 !important; }
+#clock { color: var(--q-silver) !important; font-weight: 400 !important; }
+#timeline .note, .glabel { color: var(--q-steel) !important; }
+.glabel b { color: var(--q-red2) !important; }
+.gbar { border-radius: 0 !important; }
+.gbar i { background: var(--q-red) !important; }
+.gch { color: var(--q-steel) !important; border-left-color: var(--q-line) !important; }
+.gch.on { color: var(--q-frost) !important; font-weight: 400 !important; }
+.gms { color: var(--q-frost) !important; font-weight: 400 !important; }
+.gms::after { color: var(--q-red2); }
+#head { background: var(--q-red2) !important; box-shadow: 0 0 10px rgba(255, 57, 57, .8) !important; }
+body.min #axis .gtrack, #track { border-radius: 0 !important; background: #0f0f0f !important; }
+.lab { border-radius: 0 !important; font-weight: 400 !important; }
+.lab:not(.mw):not(.ex) { background: rgba(253, 252, 252, .95) !important; color: #0c0c0c !important; box-shadow: inset 3px 0 0 var(--q-red), 0 3px 10px rgba(0, 0, 0, .45) !important; }
+.lab.mw { background: #0c0c0c !important; border-color: var(--q-line) !important; }
+#labels .lab b { color: var(--q-red2) !important; }
+
+/* inside: track segments, captions */
+.seg { border-left-color: var(--q-line) !important; color: var(--q-steel) !important; }
+.seg.on { color: var(--q-frost) !important; font-weight: 400 !important; background: rgba(218, 10, 26, .14) !important; }
+#fill { background: rgba(218, 10, 26, .18) !important; }
+#cap { font-weight: 400 !important; }
+
+/* loading */
+#load { background: #000 !important; color: var(--q-steel) !important; text-transform: uppercase; font-size: calc(var(--fs) * .9) !important; letter-spacing: .04em; }
+#load .bar { border-radius: 0 !important; height: 2px !important; background: #1d1d1d !important; }
+#load .bar i { background: var(--q-red) !important; }
+
+/* the scenario switcher (above «powered by») */
+#switcher { border-radius: 0 !important; background: var(--q-panel) !important; border: 1px solid var(--q-line) !important; padding: 0 !important; gap: 0 !important;
+  font-family: "Geologica", system-ui, sans-serif !important; }
+#switcher .lab { position: static !important; transform: none !important; opacity: 1 !important; background: none !important; box-shadow: none !important; border: 0 !important;
+  color: var(--q-steel) !important; padding: .9vh .8vw .8vh !important; border-bottom: 1px solid var(--q-line) !important; font-size: .78em !important; text-transform: uppercase; letter-spacing: .04em; }
+#switcher button { font: 400 1em "Geologica", system-ui, sans-serif !important; border-radius: 0 !important; border: 0 !important; border-bottom: 1px solid var(--q-line2) !important;
+  background: transparent !important; color: var(--q-silver) !important; padding: .9vh .8vw !important; position: relative; }
+#switcher button:hover { background: #141414 !important; color: var(--q-frost) !important; }
+#switcher button.on { background: #161616 !important; color: var(--q-frost) !important; }
+#switcher button.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--q-red); }
+#switcher button.menu { color: var(--q-steel) !important; border-bottom: 0 !important; text-transform: uppercase; font-size: .85em !important; }
+#switcher button.menu:hover { background: #fff !important; color: #0c0c0c !important; }
+#wait { background: #000 !important; color: var(--q-steel) !important; text-transform: uppercase; font-family: "Geologica", system-ui, sans-serif !important; font-size: 14px !important; letter-spacing: .04em; }
