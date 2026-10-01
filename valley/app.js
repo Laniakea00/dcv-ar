@@ -52,7 +52,7 @@ scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; scene.
 const sun = new THREE.DirectionalLight(0xfff3e2, 1.6); sun.position.set(-1.6, 3.2, -1.2);
 sun.castShadow = !mobile; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.002;
 Object.assign(sun.shadow.camera, { left: -1.4, right: 1.4, top: 1.0, bottom: -1.0, near: 0.5, far: 7 });
-scene.add(sun, sun.target, new THREE.HemisphereLight(0xdfe8ff, 0x22272e, 0.35));
+const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x22272e, 0.35); scene.add(sun, sun.target, hemi);
 // a faint floor grid under the table — the «digital twin» stage
 const grid = new THREE.GridHelper(12, 60, 0x2a2a2a, 0x151515); grid.position.y = -0.72; grid.material.transparent = true; grid.material.opacity = 0.55; scene.add(grid);
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 50);
@@ -96,9 +96,13 @@ canvas.addEventListener("pointerup", e => {
   if (!press || e.pointerId !== press.id || $("view").hidden) { press = null; return; }
   const moved = Math.hypot(e.clientX - press.x, e.clientY - press.y), quick = performance.now() - press.t < 450; press = null;
   if (moved > 8 || !quick || !STOPS.length) return;
-  const i = pickStop(e.clientX, e.clientY);
-  if (i >= 0) select(i);
+  tapStop(pickStop(e.clientX, e.clientY));
 });
+// a tap opens a building; a tap on the same building again (or on empty ground) flies back out
+function tapStop(i) {
+  if (i >= 0 && i !== selected) select(i);
+  else if (selected >= 0) back();
+}
 function pickStop(x, y) {
   ndc.set(x / innerWidth * 2 - 1, -(y / innerHeight) * 2 + 1);
   ray.setFromCamera(ndc, camera);
@@ -119,8 +123,16 @@ let hoverT = 0;
 canvas.addEventListener("pointermove", e => {
   if (e.pointerType !== "mouse" || $("view").hidden || e.buttons) return;
   const now = performance.now(); if (now - hoverT < 60) return; hoverT = now;
-  canvas.style.cursor = pickStop(e.clientX, e.clientY) >= 0 ? "pointer" : "";
+  const i = pickStop(e.clientX, e.clientY), tip = $("tip");
+  canvas.style.cursor = i >= 0 ? "pointer" : "";
+  if (i >= 0) {
+    const s = STOPS[i], st = STAT[s.status];
+    tip.innerHTML = `<i>/${pad2(s.num)}</i>${s.legend}${st ? `<em>${st.label}</em>` : ""}`;
+    tip.style.left = e.clientX + "px"; tip.style.top = e.clientY + "px"; tip.hidden = false;
+  } else tip.hidden = true;
 });
+canvas.addEventListener("pointerleave", () => { $("tip").hidden = true; });
+canvas.addEventListener("pointerdown", () => { $("tip").hidden = true; });
 
 // ---------------------------------------------------------------- the maket's objects (экспликация 1–11)
 let STOPS = [], OX = 0, OY = 0, model = null, selected = -1;
@@ -129,7 +141,8 @@ const hl = new THREE.Group(); scene.add(hl);
 const hlMat = new THREE.LineBasicMaterial({ color: 0xff3939, transparent: true, opacity: 1, depthTest: false });
 const fillMat = new THREE.MeshBasicMaterial({ color: 0xda0a1a, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
 
-async function loadStops() { const d = await (await fetch("stops.json")).json(); [OX, OY] = d.origin; STOPS = d.stops; }
+let FLOWS = [];
+async function loadStops() { const d = await (await fetch("stops.json")).json(); [OX, OY] = d.origin; STOPS = d.stops; FLOWS = d.flows || []; }
 function measureStops() {
   const meshes = []; model.traverse(o => { if (o.isMesh) meshes.push(new THREE.Box3().setFromObject(o)); });
   for (const s of STOPS) {
@@ -151,9 +164,9 @@ function measureStops() {
 }
 function buildUI() {
   $("rail").innerHTML = `<div class="r-h">№</div>` + STOPS.map((s, i) => `<button data-i="${i}" aria-label="${s.legend}">${pad2(s.num)}<span class="nm">${s.legend}</span></button>`).join("");
-  $("rail").querySelectorAll("button").forEach(b => b.onclick = () => select(+b.dataset.i));
+  $("rail").querySelectorAll("button").forEach(b => b.onclick = () => tapStop(+b.dataset.i));
   $("pins").innerHTML = STOPS.map((s, i) => `<div class="pin" data-i="${i}" title="${s.short || s.legend}"><span class="n">${s.num}</span></div>`).join("");
-  $("pins").querySelectorAll(".pin").forEach(p => p.onclick = () => select(+p.dataset.i));
+  $("pins").querySelectorAll(".pin").forEach(p => p.onclick = () => tapStop(+p.dataset.i));
   const items = STOPS.map(s => `<span><i>/${pad2(s.num)}</i> <b>${s.legend}</b>${s.value ? " — " + s.value : ""}</span>`).join("");
   $("ticker").innerHTML = items + items;
 }
@@ -170,6 +183,7 @@ function highlight(s) {
 const splitVal = v => { const m = /^([\d\s.,]+)\s*(.*)$/.exec(v || ""); return m ? [m[1].trim(), m[2]] : ["", v || ""]; };
 function select(i) {
   if (i < 0 || i >= STOPS.length) return;
+  if (selected < 0) before = { pos: camera.position.clone(), target: controls.target.clone() };
   selected = i; const s = STOPS[i];
   controls.autoRotate = false; $("spin").classList.remove("on");
   highlight(s);
@@ -180,6 +194,9 @@ function select(i) {
   $("cKind").textContent = s.kind || ""; $("cTitle").textContent = s.title || s.legend;
   const [num, unit] = splitVal(s.value); $("cVal").textContent = num; $("cUnit").textContent = num ? unit : (s.value || "");
   $("cSub").textContent = s.sub || "";
+  const st = STAT[s.status]; $("cStat").textContent = st ? st.label : ""; $("cStat").className = "stat " + (s.status || "");
+  $("cFeed").innerHTML = FEED[s.num] ? `<small>/Питание</small>${FEED[s.num]}` : "";
+  focusFlows(s.num);
   if (s.logo) $("cLogo").src = `img/logo_${s.logo}.png`; else $("cLogo").removeAttribute("src");
   $("card").hidden = false; $("card").style.animation = "none"; void $("card").offsetWidth; $("card").style.animation = "";
   const b = s.box, c = new THREE.Vector3((b.x0 + b.x1) / 2, b.top * 0.5, (b.z0 + b.z1) / 2);
@@ -190,19 +207,24 @@ function select(i) {
   const pos = c.clone().addScaledVector(dir, Math.cos(el) * dist); pos.y = c.y + Math.sin(el) * dist;
   flyTo(pos, c, 1300);
 }
+let before = null;   // the camera before the first object was opened: «back» returns there
+function back() {
+  deselect();
+  if (before) flyTo(before.pos, before.target, 1200); else goHome(1200);
+  before = null;
+}
 function deselect() {
-  selected = -1; highlight(null); $("card").hidden = true;
+  selected = -1; highlight(null); $("card").hidden = true; focusFlows(null);
   document.querySelectorAll(".rail button.on, .pin.on").forEach(e => e.classList.remove("on"));
 }
-$("cardClose").onclick = deselect;
+$("cardClose").onclick = back;
 $("prev").onclick = () => select((selected - 1 + STOPS.length) % STOPS.length);
 $("next").onclick = () => select((selected + 1) % STOPS.length);
 
 // ---------------------------------------------------------------- tools
 const goHome = (ms = 1400) => { const h = homeView(); flyTo(h.pos, h.target, ms); };
-$("reset").onclick = () => { deselect(); goHome(); };
+$("reset").onclick = () => { deselect(); before = null; goHome(); };
 $("spin").onclick = () => { controls.autoRotate = !controls.autoRotate; $("spin").classList.toggle("on", controls.autoRotate); };
-$("labels").onclick = () => { const off = $("pins").classList.toggle("off"); $("labels").classList.toggle("on", !off); };
 $("fs").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); };
 $("home").onclick = () => showWelcome();
 let hintTimer = 0;
@@ -211,15 +233,16 @@ addEventListener("keydown", e => {
   if ($("view").hidden) { const i = +e.key; if (i >= 1 && i <= SCENARIOS.length) openScenario(SCENARIOS[i - 1].k); if (e.key === "Enter") enter(); return; }
   if (e.key === "ArrowRight") select((selected + 1) % STOPS.length);
   else if (e.key === "ArrowLeft") select((selected - 1 + STOPS.length) % STOPS.length);
-  else if (e.key === "Escape") { if (selected >= 0) deselect(); else showWelcome(); }
-  else if (e.key === "r" || e.key === "R" || e.key === "к" || e.key === "К") { deselect(); goHome(); }
+  else if (e.key === "Escape") { if (selected >= 0) back(); else showWelcome(); }
+  else if (e.key === "r" || e.key === "R" || e.key === "к" || e.key === "К") { deselect(); before = null; goHome(); }
+  else { const l = { e: "energy", у: "energy", s: "status", ы: "status", n: "night", т: "night", l: "labels", д: "labels" }[e.key.toLowerCase()]; if (l) setLayer(l, !layers[l]); }
 });
 
 // ---------------------------------------------------------------- welcome ↔ 3D
 let offTarget = new URLSearchParams(location.search).get("view") === "3d" ? 0 : 1, off = 1;
 function enter() {
   if ($("enter").disabled) return;
-  document.body.classList.replace("at-welcome", "at-view"); offTarget = 0; $("crumb2").textContent = "/ 3D-макет";
+  document.body.classList.replace("at-welcome", "at-view"); offTarget = 0; $("crumb2").textContent = "/ Живой двойник";
   $("welcome").classList.add("out"); setTimeout(() => { if (offTarget === 0) $("welcome").hidden = true; }, 700);
   $("view").hidden = false; controls.enabled = true; controls.autoRotate = true; $("spin").classList.add("on");
   goHome(1800); scan();
@@ -228,7 +251,7 @@ function enter() {
 }
 function showWelcome() {
   document.body.classList.replace("at-view", "at-welcome"); offTarget = 1; $("crumb2").textContent = "/ Цифровой двойник";
-  deselect(); $("view").hidden = true; controls.enabled = false; controls.autoRotate = true;
+  deselect(); before = null; $("view").hidden = true; controls.enabled = false; controls.autoRotate = true;
   $("welcome").hidden = false; requestAnimationFrame(() => $("welcome").classList.remove("out"));
   const h = homeView(); flyTo(h.pos.clone().multiplyScalar(1.35), h.target, 1200);
   history.replaceState(null, "", location.pathname);
@@ -248,8 +271,8 @@ Promise.all([
     const m = o.material; if (m && m.map) m.map.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   });
   scene.add(model);
-  measureStops(); buildUI(); buildPlantLife();
-  $("enter").disabled = false; $("enter").classList.add("ready"); $("enterLabel").textContent = "Смотреть макет в 3D";
+  measureStops(); buildUI(); buildPlantLife(); buildTwin();
+  $("enter").disabled = false; $("enter").classList.add("ready"); $("enterLabel").textContent = "Открыть живой 3D-двойник";
   scan();
   if (offTarget === 0) { offTarget = 1; enter(); }
 }).catch(err => { console.error(err); $("enterLabel").textContent = "Не удалось загрузить — обновите страницу"; $("loadPct").textContent = ""; });
@@ -275,11 +298,12 @@ function placePins() {
     dot.setAttribute("cx", x2); dot.setAttribute("cy", y2); line.style.display = dot.style.display = "";
   } else line.style.display = dot.style.display = "none";
 }
-let lift = 0;   // phone, 3D view, an object open: the maket moves up out from under the card
+let lift = 0, side = 0;   // phone, 3D view, an object open: the maket moves up out from under the card; desktop: clear of the twin panel
 function applyOffset() {
   const w = innerWidth, h = innerHeight, wide = w / h > 1.1;
   lift += ((narrow() && selected >= 0 && offTarget === 0 ? 0.24 : 0) - lift) * 0.08;
-  const ox = (wide ? -0.16 * w : 0) * off, oy = (wide ? 0.06 * h : 0.2 * h) * off + lift * h;
+  side += ((!narrow() && wide && selected < 0 && offTarget === 0 ? 1 : 0) - side) * 0.06;
+  const ox = (wide ? -0.16 * w : 0) * off - side * Math.min(150, w * 0.1), oy = (wide ? 0.06 * h : 0.2 * h) * off + lift * h;
   if (Math.abs(ox) + Math.abs(oy) < 0.5) camera.clearViewOffset(); else camera.setViewOffset(w, h, ox, oy, w, h);
 }
 function resize() {
@@ -331,9 +355,117 @@ function tickPlant(dt) {
   const on = (plant.t % 1.6) < 0.25;
   for (const l of plant.lights) l.material.opacity = on ? 1 : 0.15;
 }
+// ---------------------------------------------------------------- the live twin: status of every object, power lines, night, layers
+const STAT = {
+  work: { label: "Работает", col: 0xfdfcfc },
+  q1: { label: "I очередь", col: 0xff3939 },
+  plan: { label: "Перспектива", col: 0x9a9a9a },
+  infra: { label: "Инфраструктура", col: 0x6a6a6a },
+};
+const FEED = {
+  "9": "Источник энергии долины: линия 500 кВ на подстанцию 500/35 кВ",
+  "4": "ГРЭС-1 → <b>ПС 500/35 кВ</b> → ПС 35/10 кВ → ЦОД I очереди",
+  "5": "ГРЭС-1 → <b>ПС 500/35 кВ</b> (перспектива) → ПС 35/10 кВ → ЦОДы",
+  "6": "ГРЭС-1 → <b>ПС 500/35 кВ</b> (перспектива) → ПС 35/10 кВ → ЦОДы",
+  "7": "ПС 500/35 кВ → <b>ПС 35/10 кВ</b> → ЦОДы, по площадке у каждой группы",
+  "1": "ГРЭС-1 → ПС 500/35 кВ (215 МВт) → ПС 35/10 кВ → <b>ЦОД</b>",
+  "2": "ГРЭС-1 → ПС 500/35 кВ (215 МВт) → ПС 35/10 кВ → <b>ЦОД</b>",
+  "3": "ГРЭС-1 → ПС 500/35 кВ (перспектива) → ПС 35/10 кВ → <b>ЦОДы</b>",
+};
+const layers = { energy: true, status: true, night: false, labels: false };
+const twin = { status: new THREE.Group(), flows: new THREE.Group(), lines: [], mats: [], night: 0 };
+scene.add(twin.status, twin.flows);
+function buildTwin() {
+  // status: a wire box around each object (solid — works, red — first phase, dashed — prospect) and a tinted roof cap:
+  // the prospect is shaded like a ghost (not built yet), the first phase glows red, what works stays as it is
+  for (const s of STOPS) {
+    const st = STAT[s.status]; if (!st) continue;
+    for (const r of s.rects) {
+      const pad = 0.005, w = r.x1 - r.x0 + 2 * pad, d = r.z1 - r.z0 + 2 * pad, h = Math.min(r.top, 0.075) + 0.004;
+      const cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+      const dashed = s.status === "plan";
+      const lm = dashed ? new THREE.LineDashedMaterial({ color: st.col, dashSize: 0.008, gapSize: 0.006, transparent: true, opacity: 0.8 })
+                        : new THREE.LineBasicMaterial({ color: st.col, transparent: true, opacity: s.status === "infra" ? 0.45 : 0.85 });
+      const e = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)), lm);
+      e.position.set(cx, h / 2, cz); if (dashed) e.computeLineDistances(); e.renderOrder = 2;
+      const capCol = { q1: 0xff2a2a, plan: 0x000000, work: 0xffffff, infra: 0x7a8a99 }[s.status];
+      const fm = new THREE.MeshBasicMaterial({ color: capCol, transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+      const f = new THREE.Mesh(new THREE.PlaneGeometry(w, d), fm); f.rotation.x = -Math.PI / 2; f.position.set(cx, h + 0.001, cz); f.renderOrder = 1;
+      twin.status.add(e, f);
+      twin.lines.push({ e, f, s, base: lm.opacity, fill: { q1: 0.2, plan: 0.42, work: 0.0, infra: 0.12 }[s.status] });
+    }
+  }
+  // power lines along the roads (the same routes as the scenario): live — red pulses, planned — grey dashes
+  for (const f of FLOWS) {
+    const live = f.kind === "existing";
+    const pts = f.path.map(p => W3(p[0], p[1], 0.0058));
+    const { g, len } = ribbon(pts, live ? 0.016 : 0.010);
+    const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide,
+      uniforms: { t: { value: 0 }, len: { value: len }, a: { value: 1 }, col: { value: new THREE.Color(live ? 0xff2020 : 0x2c2c2c) }, dash: { value: live ? 0 : 1 } },
+      vertexShader: `attribute float s; attribute float side; varying float vS; varying float vSide; void main(){ vS = s; vSide = side; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `uniform float t, len, a, dash; uniform vec3 col; varying float vS; varying float vSide;
+        void main(){ float core = smoothstep(0.0, .7, 1.0 - abs(vSide));
+          float k = fract(vS * 26.0 - t * 1.5);
+          float p = dash > .5 ? step(.45, fract(vS * 40.0 - t * .5)) * .85 : (.55 + .45 * smoothstep(.0, .2, k) * (1.0 - smoothstep(.2, .55, k)));
+          vec3 c = dash > .5 ? col : mix(col, vec3(1.0, .85, .85), smoothstep(.15, .2, k) * (1.0 - smoothstep(.2, .3, k)));
+          gl_FragColor = vec4(c, clamp(core * p * a, 0.0, 1.0)); }` });
+    const mesh = new THREE.Mesh(g, m); mesh.renderOrder = 6; twin.flows.add(mesh);
+    const node = new THREE.Mesh(new THREE.CircleGeometry(live ? 0.011 : 0.007, 20), new THREE.MeshBasicMaterial({ color: live ? 0xff2020 : 0x2c2c2c, transparent: true, opacity: .9, depthWrite: false, toneMapped: false }));
+    node.rotation.x = -Math.PI / 2; node.position.copy(pts[pts.length - 1]).setY(0.006); twin.flows.add(node);
+    twin.mats.push({ m, node, f, a: 1, goal: 1 });
+  }
+  $("layers").querySelectorAll("button").forEach(b => b.onclick = () => setLayer(b.dataset.l, !layers[b.dataset.l]));
+  for (const k in layers) setLayer(k, layers[k]);
+}
+function ribbon(points, width) {
+  const pos = [], s = [], side = [], idx = []; let acc = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], a = points[Math.max(0, i - 1)], b = points[Math.min(points.length - 1, i + 1)];
+    const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize(), n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(width / 2);
+    if (i > 0) acc += p.distanceTo(points[i - 1]);
+    pos.push(p.x + n.x, p.y, p.z + n.z, p.x - n.x, p.y, p.z - n.z); s.push(acc, acc); side.push(1, -1);
+    if (i > 0) { const o = (i - 1) * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute("s", new THREE.Float32BufferAttribute(s, 1)); g.setAttribute("side", new THREE.Float32BufferAttribute(side, 1)); g.setIndex(idx);
+  return { g, len: acc };
+}
+function setLayer(k, on) {
+  layers[k] = on;
+  $("layers").querySelector(`[data-l="${k}"]`)?.classList.toggle("on", on);
+  if (k === "labels") $("pins").classList.toggle("off", !on);
+  if (k === "status") $("twin").classList.toggle("no-status", !on);
+  if (k === "energy") $("twin").classList.toggle("no-energy", !on);
+  if (k === "night") document.body.classList.toggle("night", on);
+}
+// an open object: its own lines stay bright, the rest of the network steps back
+function focusFlows(num) {
+  for (const t of twin.mats) t.goal = !num ? 1 : t.f.to.includes(num) ? 1.35 : 0.18;
+}
+const DAY = { exp: 1.05, env: 0.85, sun: 1.6, hemi: 0.35 }, NIGHT = { exp: 0.9, env: 0.06, sun: 0.1, hemi: 0.05 };
+const sunDay = new THREE.Color(0xfff3e2), sunNight = new THREE.Color(0x8fa6ff);
+function tickTwin(dt, t) {
+  const n = twin.night += ((layers.night ? 1 : 0) - twin.night) * (1 - Math.exp(-dt * 3));
+  renderer.toneMappingExposure = THREE.MathUtils.lerp(DAY.exp, NIGHT.exp, n);
+  scene.environmentIntensity = THREE.MathUtils.lerp(DAY.env, NIGHT.env, n);
+  sun.intensity = THREE.MathUtils.lerp(DAY.sun, NIGHT.sun, n); sun.color.lerpColors(sunDay, sunNight, n);
+  hemi.intensity = THREE.MathUtils.lerp(DAY.hemi, NIGHT.hemi, n);
+  twin.status.visible = layers.status; twin.flows.visible = layers.energy;
+  const pulse = 0.5 + 0.5 * Math.sin(t * 2.4);
+  for (const l of twin.lines) {
+    const dim = selected >= 0 && STOPS[selected] !== l.s ? 0.35 : 1;
+    l.e.material.opacity = l.base * dim * (l.s.status === "q1" ? 0.7 + 0.3 * pulse : 1);
+    l.f.material.opacity = l.fill * (l.s.status === "plan" ? 1 : dim) * (l.s.status === "q1" ? (1 + n * 1.5) * (0.75 + 0.25 * pulse) : 1);
+  }
+  for (const m of twin.mats) {
+    m.a += (m.goal - m.a) * (1 - Math.exp(-dt * 4));
+    m.m.uniforms.t.value = t; m.m.uniforms.a.value = m.a * (1 + n * 0.6); m.node.material.opacity = 0.9 * Math.min(1, m.a);
+  }
+}
+
 let lastT = 0;
 renderer.setAnimationLoop(now => {
-  const dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now; tickPlant(dt);
+  const dt = Math.min(0.05, (now - (lastT || now)) / 1000); lastT = now; tickPlant(dt); tickTwin(dt, now / 1000);
   stepFlight(now);
   off += (offTarget - off) * 0.06; applyOffset();
   controls.update();

@@ -77,15 +77,44 @@
   <svg id="leader" aria-hidden="true"><line id="leaderLine"/><circle id="leaderDot" r="3"/></svg>
   <div id="pins"></div>
 
-  <nav class="rail" id="rail" aria-label="Объекты макета"></nav>
+  <nav class="rail" id="rail" aria-label="Объекты макета" hidden></nav>
+
+  <!-- the live twin: layers, status legend, the power chain -->
+  <aside class="twin" id="twin">
+    <div class="tw-h"><i class="dot"></i><span>/Живой двойник</span><small>слои</small></div>
+    <div class="tw-l" id="layers">
+      <button title="Линии питания (E)" data-l="energy" class="on"><i class="sw"></i><span>Энергосети</span><kbd>E</kbd></button>
+      <button title="Статус объектов (S)" data-l="status" class="on"><i class="sw"></i><span>Статус</span><kbd>S</kbd></button>
+      <button title="Ночной режим (N)" data-l="night"><i class="sw"></i><span>Ночь</span><kbd>N</kbd></button>
+      <button title="Номера объектов (L)" data-l="labels"><i class="sw"></i><span>Номера</span><kbd>L</kbd></button>
+    </div>
+    <div class="tw-k" id="statKey">
+      <span><i class="k work"></i>Работает</span>
+      <span><i class="k q1"></i>I очередь · 2027–28</span>
+      <span><i class="k plan"></i>Перспектива</span>
+      <span><i class="k infra"></i>Инфраструктура</span>
+    </div>
+    <div class="tw-e" id="energyKey">
+      <small>/Энергоцепочка</small>
+      <div class="chain"><b>ГРЭС-1</b><i></i><b>ПС 500/35</b><i></i><b>ПС 35/10</b><i></i><b>ЦОД</b></div>
+      <div class="bal">
+        <div class="bal-n"><b>186</b><span>/ 215 МВт</span></div>
+        <div class="bal-bar"><i></i></div>
+        <p>ЦОД I очереди (50 + 136 МВт) и мощность существующей ПС 500/35 кВ. В перспективе ещё 2 × 500 МВт.</p>
+      </div>
+      <div class="fk"><span><i class="ln live"></i>Действующая линия</span><span><i class="ln plan"></i>Планируемая</span></div>
+    </div>
+  </aside>
+  <div id="tip" hidden></div>
 
   <div id="card" hidden>
     <i class="br tl"></i><i class="br tr"></i><i class="br bl"></i><i class="br br2"></i>
-    <div class="card-top"><span class="idx" id="cIdx">/01</span><span class="kind" id="cKind"></span><button id="cardClose" class="x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+    <div class="card-top"><span class="idx" id="cIdx">/01</span><span class="kind" id="cKind"></span><span class="stat" id="cStat"></span><button id="cardClose" class="x" aria-label="Закрыть"><svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
     <h2 id="cTitle"></h2>
     <img id="cLogo" alt="">
     <div class="val"><b id="cVal"></b><span id="cUnit"></span></div>
     <div class="sub" id="cSub"></div>
+    <div class="feed" id="cFeed"></div>
     <div class="card-nav"><button id="prev" aria-label="Предыдущий"><svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5"/></svg></button><span id="cPos">01 / 11</span><button id="next" aria-label="Следующий"><svg viewBox="0 0 16 16"><path d="M6 3l5 5-5 5"/></svg></button></div>
   </div>
 
@@ -95,11 +124,10 @@
     <div class="compass" id="compass" title="Север"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/><path id="needle" d="M20 6l4 14h-8z"/><text x="20" y="35">N</text></svg></div>
     <button id="reset" class="sq" title="Общий вид" aria-label="Общий вид"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg></button>
     <button id="spin" class="sq on" title="Вращение" aria-label="Вращение"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14.5 4.7M4 12a8 8 0 0 1 14.5-4.7M18 3v4.5h-4.5M6 21v-4.5h4.5"/></svg></button>
-    <button id="labels" class="sq on" title="Номера объектов" aria-label="Номера объектов"><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="11"/><path d="M12 15v5M10.5 7.5h2v5"/></svg></button>
     <button id="fs" class="sq" title="Во весь экран" aria-label="Во весь экран"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
   </div>
 
-  <div id="hint"><span>Вращайте</span><i></i><span>Колесо / щипок — ближе</span><i></i><span>Правая кнопка / два пальца — сдвиг</span></div>
+  <div id="hint"><span>Вращайте</span><i></i><span>Нажмите на здание — открыть, ещё раз — назад</span><i></i><span>Колесо / щипок — ближе</span></div>
 </section>
 
 <div id="wait" hidden><div class="wait-line"><b></b></div><span>Открываю сценарий</span></div>
